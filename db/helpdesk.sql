@@ -36,11 +36,24 @@ GO
 USE HelpDesk
 GO
 
-CREATE TABLE [dbo].[categories] (
-	[category_id] [int] NOT NULL ,
-	[cname] [varchar] (50) NULL ,
-	[rep_id] [int] NULL 
+CREATE TABLE [dbo].[categories](
+	[category_id] [int] NOT NULL,
+	[cname] [varchar](150) NULL,
+	[rep_id] [int] NULL,
+	[vertical] [int] NULL,
+	[estado] [bit] NULL,
+	[proceso] [int] NULL,
+	[ANS] [numeric](18, 0) NULL,
+	[TipoAns] [varchar](1) NULL,
+	[TipoIndicador] [int] NULL,
+	[Ans_Ini] [numeric](18, 0) NULL,
+	[TipoAnsIni] [varchar](1) NULL,
+ CONSTRAINT [PK__categori__D54EE9B42343D751] PRIMARY KEY CLUSTERED 
+(
+	[category_id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, FILLFACTOR = 80) ON [PRIMARY]
 ) ON [PRIMARY]
+
 GO
 
 CREATE TABLE [dbo].[db_keys] (
