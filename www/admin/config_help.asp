@@ -1,5 +1,5 @@
-<%@ LANGUAGE="VBScript" %>
-<% 
+<%@ LANGUAGE="VBScript" CODEPAGE="65001" %>
+<%
   Option Explicit
   'Buffer the response, so Response.Expires can be used
   Response.Buffer = TRUE
@@ -19,10 +19,10 @@
   Version:  $Revision: 1.50 $
   Purpose:  Describes the various settings.
   -->
-  
+
   <!-- 	#include file = "../public.asp" -->
 
-  <% 
+  <%
     Dim cnnDB, sid
     Set cnnDB = CreateCon
     sid = GetSid
@@ -30,112 +30,71 @@
 
   <head>
     <title><%=lang(cnnDB, "HelpDesk")%>&nbsp;-&nbsp;<%=lang(cnnDB, "ConfigurationHelp")%></title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" type="text/css" href="../default.css">
+    <style type="text/css">
+      .ch-wrap { max-width: 960px; margin: 0 auto; }
+      .ch-term { width: 260px; font-weight: 600; vertical-align: top; }
+    </style>
   </head>
   <body>
 
     <%
       ' Check for perms to view this page
       Call CheckAdmin
+      Call DisplayHeader(cnnDB, sid)
 
+      ' Renders one row of the help table
+      Sub HelpRow(termKey, helpKey)
+        Response.Write "<tr><td class=""ch-term"">" & lang(cnnDB, termKey) & "</td><td>" & lang(cnnDB, helpKey) & "</td></tr>" & vbCrLf
+      End Sub
     %>
 
-    <div align="center">
-      <table class="Normal">
-        <tr class="Head1">
-          <td colspan="2" >
-            <%=lang(cnnDB, "ConfigurationHelp")%>
-          </td>
-        </tr>
-        <tr class="Body1" valign="top" valign="top">
-          <td><b><%=lang(cnnDB, "SiteName")%></b></td>
-          <td><%=lang(cnnDB, "SiteNameHelp")%></td>
-        </tr>
-        <tr class="Body2" valign="top">
-          <td><b><%=lang(cnnDB, "BaseURL")%></b></td>
-          <td><%=lang(cnnDB, "BaseURLHelp_2")%></td>
-        </tr>
-        <tr class="Body1" valign="top">
-          <td><b><%=lang(cnnDB, "AdministratorsName")%></b></td>
-          <td><%=lang(cnnDB, "AdministratorsNameHelp")%></td>
-        </tr>
-        <tr class="Body2" valign="top">
-          <td><b><%=lang(cnnDB, "AdministratorsEmail")%></b></td>
-          <td><%=lang(cnnDB, "AdministratorsEmailHelp")%></td>
-        </tr>
-        <tr class="Body1" valign="top">
-          <td><b><%=lang(cnnDB, "BaseEmail")%></b></td>
-          <td><%=lang(cnnDB, "BaseEmailHelp")%></td>
-        </tr>
-        <tr class="Body2" valign="top">
-          <td><b><%=lang(cnnDB, "EmailType")%></b></td>
-          <td><%=lang(cnnDB, "EmailTypeHelp")%></td>
-        </tr>
-        <tr class="Body1" valign="top">
-          <td><b><%=lang(cnnDB, "SMTPServer")%></b></td>
-          <td><%=lang(cnnDB, "SMTPServerHelp")%></td>
-        </tr>
-        <tr class="Body2" valign="top">
-          <td><b><%=lang(cnnDB, "PagerPriorityLevel")%></b></td>
-          <td><%=lang(cnnDB, "PagerPriorityLevelHelp")%></td>
-        </tr>
-        <tr class="Body1" valign="top">
-          <td><b><%=lang(cnnDB, "EmailUseronUpdate")%></b></td>
-          <td><%=lang(cnnDB, "EmailUseronUpdateHelp")%></td>
-        </tr>
-        <tr class="Body2" valign="top">
-          <td><b><%=lang(cnnDB, "EnableUserKB")%></b></td>
-          <td><%=lang(cnnDB, "EnableUserKBHelp")%></td>
-        </tr>
-        <tr class="Body1" valign="top">
-          <td><b><%=lang(cnnDB, "KBSQLFreeTextSearches")%></b></td>
-          <td><%=lang(cnnDB, "KBSQLFreeTextSearchesHelp")%></td>
-        </tr>
-        <tr class="Body2" valign="top">
-          <td><b><%=lang(cnnDB, "DefaultPriority")%></b></td>
-          <td><%=lang(cnnDB, "DefaultPriorityHelp")%></td>
-        </tr>
-        <tr class="Body1" valign="top">
-          <td><b><%=lang(cnnDB, "DefaultStatus")%></b></td>
-          <td><%=lang(cnnDB, "DefaultStatusHelp")%></td>
-        </tr>
-        <tr class="Body2" valign="top">
-          <td><b><%=lang(cnnDB, "CloseStatus")%></b></td>
-          <td><%=lang(cnnDB, "CloseStatusHelp")%></td>
-        </tr>
-        <tr class="Body1" valign="top">
-          <td><b><%=lang(cnnDB, "AuthenticationType")%></b></td>
-          <td><%=lang(cnnDB, "AuthenticationTypeHelp")%></td>
-        </tr>
-        <tr class="Body2" valign="top">
-          <td><b><%=lang(cnnDB, "UseSelectUser")%></b></td>
-          <td><%=lang(cnnDB, "UseSelectUserHelp")%></td>
-        </tr>
-        <tr class="Body1" valign="top">
-          <td><b><%=lang(cnnDB, "UseInOutBoard")%></b></td>
-          <td><%=lang(cnnDB, "UseInOutBoardHelp")%></td>
-        </tr>
-        <tr class="Body2" valign="top">
-          <td><b><%=lang(cnnDB, "AllowImageUpload")%></b></td>
-          <td><%=lang(cnnDB, "AllowImageUploadHelp")%></td>
-        </tr>
-        <tr class="Body1" valign="top">
-          <td><b><%=lang(cnnDB, "MaxImageSize")%></b></td>
-          <td><%=lang(cnnDB, "MaxImageSizeHelp")%></td>
-        </tr>
-        <tr class="Body2" valign="top">
-          <td><b><%=lang(cnnDB, "Defaultlanguage")%></b></td>
-          <td><%=lang(cnnDB, "DefaultlanguageHelp")%></td>
-        </tr>
-      </table>
-      <form>
-        <input type=button value="<%=lang(cnnDB, "CloseThisWindow")%>" onClick="javascript:window.close();">
-      </form>
+    <div class="lhd-wrapper">
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px">
+        <div class="lhd-page-title" style="margin:0">
+          <span class="title-icon">&#8505;</span>
+          <%=lang(cnnDB, "ConfigurationHelp")%>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <a class="btn btn-secondary" href="config.asp">&larr; <%=lang(cnnDB, "Configuration")%></a>
+          <a class="btn btn-secondary" href="default.asp">&larr; <%=lang(cnnDB, "AdministrativeMenu")%></a>
+          <button type="button" class="btn btn-secondary" onclick="window.close();"><%=lang(cnnDB, "CloseThisWindow")%></button>
+        </div>
+      </div>
+
+      <div class="ch-wrap">
+        <div class="lhd-card lhd-card-flush">
+          <table class="lhd-table">
+            <tbody>
+              <% Call HelpRow("SiteName", "SiteNameHelp") %>
+              <% Call HelpRow("BaseURL", "BaseURLHelp_2") %>
+              <% Call HelpRow("AdministratorsName", "AdministratorsNameHelp") %>
+              <% Call HelpRow("AdministratorsEmail", "AdministratorsEmailHelp") %>
+              <% Call HelpRow("BaseEmail", "BaseEmailHelp") %>
+              <% Call HelpRow("EmailType", "EmailTypeHelp") %>
+              <% Call HelpRow("SMTPServer", "SMTPServerHelp") %>
+              <% Call HelpRow("PagerPriorityLevel", "PagerPriorityLevelHelp") %>
+              <% Call HelpRow("EmailUseronUpdate", "EmailUseronUpdateHelp") %>
+              <% Call HelpRow("EnableUserKB", "EnableUserKBHelp") %>
+              <% Call HelpRow("KBSQLFreeTextSearches", "KBSQLFreeTextSearchesHelp") %>
+              <% Call HelpRow("DefaultPriority", "DefaultPriorityHelp") %>
+              <% Call HelpRow("DefaultStatus", "DefaultStatusHelp") %>
+              <% Call HelpRow("CloseStatus", "CloseStatusHelp") %>
+              <% Call HelpRow("AuthenticationType", "AuthenticationTypeHelp") %>
+              <% Call HelpRow("UseSelectUser", "UseSelectUserHelp") %>
+              <% Call HelpRow("UseInOutBoard", "UseInOutBoardHelp") %>
+              <% Call HelpRow("AllowImageUpload", "AllowImageUploadHelp") %>
+              <% Call HelpRow("MaxImageSize", "MaxImageSizeHelp") %>
+              <% Call HelpRow("Defaultlanguage", "DefaultlanguageHelp") %>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <%
-    '	cfgRes.Close
-
       Call DisplayFooter(cnnDB, sid)
       cnnDB.Close
     %>

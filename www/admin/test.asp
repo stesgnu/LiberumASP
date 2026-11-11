@@ -1,4 +1,4 @@
-<%@ LANGUAGE="VBScript" %>
+<%@ LANGUAGE="VBScript" CODEPAGE="65001" %>
 <% 
   Option Explicit
   'Buffer the response, so Response.Expires can be used
@@ -22,7 +22,7 @@
   
   <!-- 	#include file = "../public.asp" -->
 
-  <% 
+  <%
     Dim cnnDB, sid
     Set cnnDB = CreateCon
     sid = GetSid
@@ -32,58 +32,78 @@
     <title>
       <%=lang(cnnDB, "HelpDesk")%>&nbsp;-&nbsp;<%=Lang(cnnDB, "TestConfiguration")%>
     </title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" type="text/css" href="../default.css">
+    <style type="text/css">
+      .tst-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; align-items: start; }
+      .tst-desc { color: #64748b; font-size: 13px; margin: 0 0 14px; }
+      .tst-rows { margin: 0 0 16px; border: 1px solid var(--color-border-light, #E2E8F0); border-radius: 8px; overflow: hidden; }
+      .tst-row { display: flex; justify-content: space-between; gap: 12px; padding: 9px 14px; font-size: 13px; }
+      .tst-row + .tst-row { border-top: 1px solid var(--color-border-light, #E2E8F0); }
+      .tst-row span:first-child { color: #64748b; }
+      .tst-row span:last-child { font-weight: 600; color: #1a202c; text-align: right; word-break: break-all; }
+    </style>
   </head>
   <body>
-    <div align="center">
-      <table class="Normal">
-        <tr class="Head1">
-          <td>
-            <%=Lang(cnnDB, "TestConfiguration")%>
-          </td>
-        </tr>
-        <%
-          ' Check for perms to view this page
-          Call CheckAdmin
 
-          Dim doit
-          doit = request.querystring("doit")
+    <%
+      ' Check for perms to view this page
+      Call CheckAdmin
+      Call DisplayHeader(cnnDB, sid)
 
-          If doit = 1 Then
-            Dim rstConfig
-            ' Get current configuration
-            Set rstConfig = SQLQuery(cnnDB, "Select * From tblConfig")
-      
-            If rstConfig.EOF Then
-              Call DisplayError(3, lang(cnnDB, "Unabletoreadconfigurationfromthedatabase"))
-            End If
+      ' Valores actuales de la configuracion de correo
+      Dim cfgReply, cfgName, cfgSmtp
+      cfgReply = Trim(Cfg(cnnDB, "HDReply") & "")
+      cfgName = Trim(Cfg(cnnDB, "HDName") & "")
+      cfgSmtp = Trim(Cfg(cnnDB, "SMTPServer") & "")
 
-            Dim strTo, strSubject, StrBody            
-            strTo = rstConfig("HDReply")
-            strSubject = "Test Message"
-            strBody = "This is a test message from Liberum Help Desk"
-            
-            Call SendMail (strTo, Cfg(cnnDB, "HDReply"), Cfg(cnnDB, "HDName"), strSubject, strBody, cnnDB)
-            Response.Write "<tr class=""Head2"" align=""center""><td>" & Lang(cnnDB,"Messagesentto") & " " & strTo & "</td></tr>"
-           	rstConfig.Close
-          End if
-        %>
-        <tr class="body1c">
-          <td><a href="sysinfo.asp"><%=Lang(cnnDB, "ShowSystemInformation")%></a></td>
-        </tr>
+      ' Envio del correo de prueba (solo por POST: no se dispara con solo abrir un enlace)
+      If Request.Form("doit") = "1" Then
+        If Len(cfgReply) = 0 Then
+          Call LhdToast("error", "No hay una direcci" & ChrW(243) & "n de respuesta configurada (HDReply). Config" & ChrW(250) & "rela en la configuraci" & ChrW(243) & "n del sitio.")
+        Else
+          Call SendMail(cfgReply, cfgReply, cfgName, "Test Message", "This is a test message from Liberum Help Desk", cnnDB)
+          Call LhdToast("success", Lang(cnnDB, "Messagesentto") & " " & cfgReply)
+        End If
+      End If
+    %>
 
-        <tr class="body1c">
-          <td><a href="test.asp?doit=1"><%=Lang(cnnDB, "SendTestEmail")%></a></td>
-        </tr>
+    <div class="lhd-wrapper">
 
-        <tr class="body2">
-          <td align="right"><a href="default.asp"><%=lang(cnnDB, "AdministrativeMenu")%></a></td>
-        </tr>
-      </table>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px">
+        <div class="lhd-page-title" style="margin:0">
+          <span class="title-icon">&#128295;</span>
+          <%=Lang(cnnDB, "TestConfiguration")%>
+        </div>
+        <a class="btn btn-secondary" href="default.asp">&larr; <%=lang(cnnDB, "AdministrativeMenu")%></a>
+      </div>
+
+      <div class="tst-grid">
+
+        <div class="lhd-card">
+          <div class="section-header">&#128231; Correo electr&oacute;nico</div>
+          <p class="tst-desc">Env&iacute;a un mensaje de prueba a la direcci&oacute;n de respuesta del Help Desk para comprobar que el servidor de correo funciona.</p>
+          <div class="tst-rows">
+            <div class="tst-row"><span>Destinatario (HDReply)</span><span><% If Len(cfgReply) > 0 Then Response.Write(Server.HTMLEncode(cfgReply)) Else Response.Write("&mdash;") End If %></span></div>
+            <div class="tst-row"><span>Nombre del remitente</span><span><% If Len(cfgName) > 0 Then Response.Write(Server.HTMLEncode(cfgName)) Else Response.Write("&mdash;") End If %></span></div>
+            <div class="tst-row"><span>Servidor SMTP</span><span><% If Len(cfgSmtp) > 0 Then Response.Write(Server.HTMLEncode(cfgSmtp)) Else Response.Write("&mdash;") End If %></span></div>
+          </div>
+          <form method="post" action="test.asp" style="margin:0">
+            <input type="hidden" name="doit" value="1">
+            <button type="submit" class="btn btn-primary">&#128228; <%=Lang(cnnDB, "SendTestEmail")%></button>
+          </form>
+        </div>
+
+        <div class="lhd-card">
+          <div class="section-header">&#8505; Informaci&oacute;n del sistema</div>
+          <p class="tst-desc">Consulta los datos del servidor y de la base de datos para diagnosticar problemas de instalaci&oacute;n o de conexi&oacute;n.</p>
+          <a class="btn btn-secondary" href="sysinfo.asp">&#128269; <%=Lang(cnnDB, "ShowSystemInformation")%></a>
+        </div>
+
+      </div>
     </div>
 
     <%
-
       Call DisplayFooter(cnnDB, sid)
       cnnDB.Close
     %>

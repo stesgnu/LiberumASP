@@ -1,4 +1,4 @@
-<%@ LANGUAGE="VBScript" %>
+<%@ LANGUAGE="VBScript" CODEPAGE="65001" %>
 <% 
   Option Explicit
   'Buffer the response, so Response.Expires can be used
@@ -39,60 +39,64 @@
     <%
       ' Check for perms to view this page
       Call CheckAdmin
+      Call DisplayHeader(cnnDB, sid)
 
       Dim rstStat
       Set rstStat = SQLQuery(cnnDB, "SELECT status_id, sname FROM status WHERE status_id > 0 ORDER BY status_id ASC")
 
     %>
-    <div align="center">
-      <table class="Normal">
-        <tr class="Head1">
-          <td colspan="3">
-            <%=lang(cnnDB, "Statuses")%>
-          </td>
-        </tr>
-        <tr class="Head2">
-          <td>
-            <div align="center">
-              <%=lang(cnnDB, "ID")%>
-          </td>
-          <td>
-            <div align="center">
-              <%=lang(cnnDB, "Status")%>
-          </td>
-          <td>
-            <div align="center">
-              <%=lang(cnnDB, "Modify")%>
-            </div>
-          </td>
-        </tr>
-        <%
-          Do While Not rstStat.EOF
-        %>
-        <tr class="Body1">
-          <td align="center">
-            <% = rstStat("status_id") %>
-            <% If Cint(rstStat("status_id")) = Cfg(cnnDB, "CloseStatus") Then
-              Response.Write("<em>*</em>")
-              End If
+    <div class="lhd-wrapper">
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px">
+        <div class="lhd-page-title" style="margin:0">
+          <span class="title-icon">&#128204;</span>
+          <%=lang(cnnDB, "Statuses")%>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <a class="btn btn-secondary" href="default.asp">&larr; <%=lang(cnnDB, "AdministrativeMenu")%></a>
+          <form method="post" action="modify.asp?mtype=5" style="margin:0">
+            <button type="submit" class="btn btn-primary">&#10133; <%=lang(cnnDB, "AddNew")%>&nbsp;<%=lang(cnnDB, "Status")%></button>
+          </form>
+        </div>
+      </div>
+
+      <div class="lhd-card lhd-card-flush">
+        <div style="overflow-x:auto">
+          <table class="lhd-table">
+            <thead>
+              <tr>
+                <th><%=lang(cnnDB, "ID")%></th>
+                <th><%=lang(cnnDB, "Status")%></th>
+                <th class="col-actions"><%=lang(cnnDB, "Modify")%></th>
+              </tr>
+            </thead>
+            <tbody>
+            <%
+              Do While Not rstStat.EOF
             %>
-          </td>
-          <td align="center">
-            <% = rstStat("sname") %>
-          </td>
-          <td align="center">
-            <a href="modify.asp?mtype=5&id=<% = rstStat("status_id") %>"><%=lang(cnnDB, "Edit")%></a>
-            &nbsp;|&nbsp; <a href="confdelete.asp?mtype=5&id=<% = rstStat("status_id") %>"><%=lang(cnnDB, "Delete")%></a>
-          </td>
-        </tr>
-        <%
-          rstStat.MoveNext
-          Loop
-        %>
-      </table>
-      <i><em>*</em><%=lang(cnnDB, "ClosedStatusDonotdelete")%>.</i>
-      <p><form method="post" action="modify.asp?mtype=5"><input type="submit" value="<%=lang(cnnDB, "AddNew")%>&nbsp;<%=lang(cnnDB, "Status")%>"></form></p>
-      <p><a href="default.asp"><%=lang(cnnDB, "AdministrativeMenu")%></a></p>
+              <tr>
+                <td>
+                  <span class="badge"><% = Server.HTMLEncode(rstStat("status_id") & "") %></span>
+                  <% If Cint(rstStat("status_id")) = Cfg(cnnDB, "CloseStatus") Then
+                    Response.Write("<em>*</em>")
+                    End If
+                  %>
+                </td>
+                <td><strong><% = Server.HTMLEncode(rstStat("sname") & "") %></strong></td>
+                <td class="col-actions">
+                  <a class="btn btn-secondary btn-sm" href="modify.asp?mtype=5&amp;id=<% = rstStat("status_id") %>">&#9998; <%=lang(cnnDB, "Edit")%></a>
+                  <a class="btn btn-secondary btn-sm" href="confdelete.asp?mtype=5&amp;id=<% = rstStat("status_id") %>">&#128465; <%=lang(cnnDB, "Delete")%></a>
+                </td>
+              </tr>
+            <%
+              rstStat.MoveNext
+              Loop
+            %>
+            </tbody>
+          </table>
+        </div>
+        <div style="padding:12px 16px;font-size:13px;color:#64748b;border-top:1px solid var(--color-border-light,#E2E8F0)"><em>*</em> <%=lang(cnnDB, "ClosedStatusDonotdelete")%>.</div>
+      </div>
     </div>
 
     <%

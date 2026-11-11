@@ -1,4 +1,4 @@
-<%@ LANGUAGE="VBScript" %>
+<%@ LANGUAGE="VBScript" CODEPAGE="65001" %>
 <% 
   Option Explicit
   'Buffer the response, so Response.Expires can be used
@@ -30,6 +30,30 @@
     Call SetAppVariables
     Dim cnnDB
     Set cnnDB = CreateCon
+
+    ' Seguridad: si la base ya esta instalada (existe tblConfig), solo un administrador
+    ' con sesion iniciada puede ejecutar el instalador/actualizador.
+    Dim setupInstalled, setupChk
+    setupInstalled = False
+    On Error Resume Next
+    Set setupChk = cnnDB.Execute("SELECT * FROM tblConfig")
+    If Err.Number = 0 Then
+      setupInstalled = True
+      setupChk.Close
+    End If
+    Err.Clear
+    On Error Goto 0
+    If setupInstalled Then
+      If Session("lhd_IsAdmin") <> True Then
+        cnnDB.Close
+        Response.Clear
+        Response.Status = "403 Forbidden"
+        Response.Write "<html><head><title>Acceso denegado</title></head><body style=""font-family:sans-serif;text-align:center;margin-top:60px"">" & _
+          "<h2>Acceso denegado</h2><p>El instalador solo est&aacute; disponible para administradores. " & _
+          "Inicie sesi&oacute;n en <a href=""admin/"">el panel de administraci&oacute;n</a> y vuelva a intentarlo.</p></body></html>"
+        Response.End
+      End If
+    End If
   %>
 
   <head>
@@ -363,12 +387,12 @@
 
         'French
         If Request.Form("french") <> "" Then
-          Call UpdateLang("French", "Français", "French_Français.txt")
+          Call UpdateLang("French", "Franï¿½ais", "French_Franï¿½ais.txt")
         End If
 
         'Spanish
         If Request.Form("spanish") <> "" Then
-          Call UpdateLang("Spanish", "Español", "Spanish_Español.txt")
+          Call UpdateLang("Spanish", "Espaï¿½ol", "Spanish_Espaï¿½ol.txt")
         End If
 
         ' Remove cached language strings

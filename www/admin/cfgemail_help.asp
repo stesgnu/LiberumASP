@@ -1,5 +1,5 @@
-<%@ LANGUAGE="VBScript" %>
-<% 
+<%@ LANGUAGE="VBScript" CODEPAGE="65001" %>
+<%
   Option Explicit
   'Buffer the response, so Response.Expires can be used
   Response.Buffer = TRUE
@@ -19,10 +19,10 @@
   Version:  $Revision: 1.50 $
   Purpose:  Help page for configuring email.
   -->
-  
+
   <!-- 	#include file = "../public.asp" -->
 
-  <% 
+  <%
     Dim cnnDB, sid
     Set cnnDB = CreateCon
     sid = GetSid
@@ -32,242 +32,96 @@
     <title>
       <%=lang(cnnDB, "HelpDesk")%>&nbsp;-&nbsp;<%=lang(cnnDB, "MessageConfigurationHelp")%>
     </title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" type="text/css" href="../default.css">
+    <style type="text/css">
+      .eh-wrap { max-width: 960px; margin: 0 auto; }
+      .eh-term { width: 220px; vertical-align: top; }
+      .eh-term code { font-family: Consolas, "Courier New", monospace; font-weight: 600; color: var(--color-primary, #0057B8); }
+    </style>
   </head>
   <body>
 
   <%
     ' Check for perms to view this page
     Call CheckAdmin
+    Call DisplayHeader(cnnDB, sid)
 
+    ' Row with a language-key definition
+    Sub VarRow(varName, helpKey)
+      Response.Write "<tr><td class=""eh-term""><code>" & varName & "</code></td><td>" & lang(cnnDB, helpKey) & "</td></tr>" & vbCrLf
+    End Sub
+
+    ' Row with a literal definition
+    Sub VarRowText(varName, helpText)
+      Response.Write "<tr><td class=""eh-term""><code>" & varName & "</code></td><td>" & helpText & "</td></tr>" & vbCrLf
+    End Sub
   %>
 
-  <div align="center">
-    <table class="Normal">
-      <tr class="Head1">
-        <td colspan="2">
-          <%=lang(cnnDB, "MessageConfigurationHelp")%>
-        </td>
-      </tr>
-      <tr class="Body1">
-        <td colspan="2">
-          <%=lang(cnnDB, "MessageConfigurationHelpText")%>
-          <p>
-            <%=lang(cnnDB, "ProblemID")%>: <b>[problemid]</b><br>
-            <%=lang(cnnDB, "Title")%>: <b>[title]</b>
-          </p><br />
-        </td>
-      </tr>
-      <tr class="Body1">
-        <td>
-          <b><%=lang(cnnDB, "Variable")%></b>
-        </td>
-        <td>
-          <b><%=lang(cnnDB, "Definition")%></b>
-        </td>
-      </tr>
-      <tr class="Body1">
-        <td>
-          problemid
-        </td>
-        <td>
-          <%=lang(cnnDB, "problemidHelp")%>
-        </td>
-      </tr>
-      <tr class="Body1">
-        <td>
-          title
-        </td>
-        <td>
-          <%=lang(cnnDB, "titleHelp")%>
-        </td>
-      </tr>
-      <tr class="Body1">
-        <td>
-          category
-        </td>
-        <td>
-          <%=lang(cnnDB, "categoryHelp")%>
-        </td>
-      </tr>
-      <tr class="Body1">
-        <td>
-          status
-        </td>
-        <td>
-          <%=lang(cnnDB, "statusHelp")%>
-        </td>
-      </tr>
-      <tr class="Body1">
-        <td>
-          priority
-        </td>
-        <td>
-          <%=lang(cnnDB, "priorityHelp")%>
-        </td>
-      </tr>
-      <tr class="Body1">
-        <td>
-          startdate
-        </td>
-        <td>
-          <%=lang(cnnDB, "startdateHelp")%>
-        </td>
-      </tr>
-      <tr class="Body1">
-        <td>
-          closedate
-        </td>
-        <td>
-          <%=lang(cnnDB, "closedateHelp")%>
-        </td>
-      </tr>
-      <tr class="Body1">
-        <td>
-          department
-        </td>
-        <td>
-          <%=lang(cnnDB, "departmentHelp")%>
-        </td>
-      </tr>
-      <tr class="Body1">
-        <td>
-          description
-        </td>
-        <td>
-          <%=lang(cnnDB, "descriptionHelp")%>
-        </td>
-      </tr>
-      <tr class="Body1">
-        <td>
-          notes
-        </td>
-        <td>
-          <%=lang(cnnDB, "notesHelp")%>
-        </td>
-      </tr>
-      <tr class="Body1">
-        <td>
-          solution
-        </td>
-        <td>
-          <%=lang(cnnDB, "solutionHelp")%>
-        </td>
-      </tr>
-      <tr class="Body1">
-        <td>
-          uid
-        </td>
-        <td>
-          <%=lang(cnnDB, "uidHelp")%>
-        </td>
-      </tr>
-      <tr class="Body1">
-        <td>
-          ufname
-        </td>
-        <td>
-          <%=lang(cnnDB, "ufnameHelp")%>
-        </td>
-      </tr>
-      <tr class="Body1">
-        <td>
-          uemail
-        </td>
-        <td>
-          <%=lang(cnnDB, "uemailHelp")%>
-        </td>
-      </tr>
-      <tr class="Body1">
-        <td>
-          phone
-        </td>
-        <td>
-          <%=lang(cnnDB, "phoneHelp")%>
-        </td>
-      </tr>
-      <tr class="Body1">
-        <td>
-          location
-        </td>
-        <td>
-          <%=lang(cnnDB, "locationHelp")%>
-        </td>
-      </tr>
-      <tr class="Body1">
-        <td>
-          uurl
-        </td>
-        <td>
-          <%=lang(cnnDB, "uurlHelp")%>
-        </td>
-      </tr>
-      <tr class="Body1">
-        <td>
-          rid
-        </td>
-        <td>
-          <%=lang(cnnDB, "ridHelp")%>
-        </td>
-      </tr>
-      <tr class="Body1">
-        <td>
-          rfname
-        </td>
-        <td>
-          <%=lang(cnnDB, "rfnameHelp")%>
-        </td>
-      </tr>
-      <tr class="Body1">
-        <td>
-          remail
-        </td>
-        <td>
-          <%=lang(cnnDB, "remailHelp")%>
-        </td>
-      </tr>
-      <tr class="Body1">
-        <td>
-          rurl
-        </td>
-        <td>
-          <%=lang(cnnDB, "rurlHelp")%>
-        </td>
-      </tr>
-      <tr class="Body1">
-        <td>
-          baseurl
-        </td>
-        <td>
-          <%=lang(cnnDB, "baseurlHelp")%>
-        </td>
-      </tr>
-      <tr class="Body1">
-        <td>
-          u_title
-        </td>
-        <td>
-          URL Encoded version of the title.
-        </td>
-      </tr>
-	        <tr class="Body1">
-        <td>
-          u_rfname
-        </td>
-        <td>
-          URL Encoded version of the support representative's full name.
-        </td>
-      </tr>
-    </table>
-    <p>
-    <form>
-      <input type=button value="<%=lang(cnnDB, "CloseThisWindow")%>" onClick="javascript:window.close();">
-    </form>
+  <div class="lhd-wrapper">
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px">
+      <div class="lhd-page-title" style="margin:0">
+        <span class="title-icon">&#8505;</span>
+        <%=lang(cnnDB, "MessageConfigurationHelp")%>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <a class="btn btn-secondary" href="cfgemail.asp">&larr; <%=lang(cnnDB, "EmailMessages")%></a>
+        <a class="btn btn-secondary" href="default.asp">&larr; <%=lang(cnnDB, "AdministrativeMenu")%></a>
+        <button type="button" class="btn btn-secondary" onclick="window.close();"><%=lang(cnnDB, "CloseThisWindow")%></button>
+      </div>
+    </div>
+
+    <div class="eh-wrap">
+      <div class="lhd-card" style="margin-bottom:18px">
+        <div class="section-header">&#128221; <%=lang(cnnDB, "MessageConfigurationHelp")%></div>
+        <p><%=lang(cnnDB, "MessageConfigurationHelpText")%></p>
+        <p>
+          <%=lang(cnnDB, "ProblemID")%>: <b>[problemid]</b><br>
+          <%=lang(cnnDB, "Title")%>: <b>[title]</b>
+        </p>
+      </div>
+
+      <div class="lhd-card lhd-card-flush">
+        <table class="lhd-table">
+          <thead>
+            <tr>
+              <th><%=lang(cnnDB, "Variable")%></th>
+              <th><%=lang(cnnDB, "Definition")%></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% Call VarRow("problemid", "problemidHelp") %>
+            <% Call VarRow("title", "titleHelp") %>
+            <% Call VarRow("category", "categoryHelp") %>
+            <% Call VarRow("status", "statusHelp") %>
+            <% Call VarRow("priority", "priorityHelp") %>
+            <% Call VarRow("startdate", "startdateHelp") %>
+            <% Call VarRow("closedate", "closedateHelp") %>
+            <% Call VarRow("department", "departmentHelp") %>
+            <% Call VarRow("description", "descriptionHelp") %>
+            <% Call VarRow("notes", "notesHelp") %>
+            <% Call VarRow("solution", "solutionHelp") %>
+            <% Call VarRow("uid", "uidHelp") %>
+            <% Call VarRow("ufname", "ufnameHelp") %>
+            <% Call VarRow("uemail", "uemailHelp") %>
+            <% Call VarRow("phone", "phoneHelp") %>
+            <% Call VarRow("location", "locationHelp") %>
+            <% Call VarRow("uurl", "uurlHelp") %>
+            <% Call VarRow("rid", "ridHelp") %>
+            <% Call VarRow("rfname", "rfnameHelp") %>
+            <% Call VarRow("remail", "remailHelp") %>
+            <% Call VarRow("rurl", "rurlHelp") %>
+            <% Call VarRow("baseurl", "baseurlHelp") %>
+            <% Call VarRowText("u_title", "URL Encoded version of the title.") %>
+            <% Call VarRowText("u_rfname", "URL Encoded version of the support representative's full name.") %>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
   <%
-  '	cfgRes.Close
-
     Call DisplayFooter(cnnDB, sid)
     cnnDB.Close
   %>

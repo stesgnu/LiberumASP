@@ -1,4 +1,4 @@
-<%@ LANGUAGE="VBScript" %>
+<%@ LANGUAGE="VBScript" CODEPAGE="65001" %>
 <% 
   Option Explicit
   'Buffer the response, so Response.Expires can be used
@@ -39,62 +39,60 @@
     <%
       ' Check for perms to view this page
       Call CheckAdmin
+      Call DisplayHeader(cnnDB, sid)
 
       Dim rstLanguage
       Set rstLanguage = SQLQuery(cnnDB, "SELECT * FROM tblLanguage ORDER BY id ASC")
 
     %>
-    <div align="center">
-      <table class="Normal">
-        <tr class="Head1">
-          <td colspan="3">
-            <%=lang(cnnDB, "Languages")%>
-          </td>
-        </tr>
-        <tr class="Head2">
-          <td>
-            <div align="center">
-              <%=lang(cnnDB, "Language")%>
-            </div>
-          </td>
-          <td>
-            <div align="center">
-              <%=lang(cnnDB, "Localized")%>
-            </div>
-          </td>
-          <td>
-            <div align="center">
-              <%=lang(cnnDB, "Modify")%>
-            </div>
-          </td>
-        </tr>
-        <%
-          Do While Not rstLanguage.EOF
-        %>
-        <tr class="Body1">
-          <td align="center">
-            <% = rstLanguage("LangName") %>
-          </td>
-          <td align="center">
-             <% = rstLanguage("Localized") %>
-          </td>
-          <td align="center">
-            <% If rstLanguage("id") <> 1 Then %>
-              <a href="modify.asp?mtype=6&id=<% = rstLanguage("id") %>"><%=lang(cnnDB, "Edit")%></a>
-              &nbsp;|&nbsp;
-              <a href="confdelete.asp?mtype=6&id=<% = rstLanguage("id") %>"><%=lang(cnnDB, "Delete")%></a>
-              &nbsp;|&nbsp;
-            <% End If %>
-            <a href="viewlangstring.asp?lang_id=<% = rstLanguage("id") %>"><%=lang(cnnDB, "Strings")%></a>
-          </td>
-        </tr>
-        <%
-          rstLanguage.MoveNext
-          Loop
-        %>
-      </table>
-      <p><form method="post" action="modify.asp?mtype=6"><input type="submit" value="<%=lang(cnnDB, "AddNew")%>&nbsp;<%=lang(cnnDB, "Language")%>"></form></p>
-      <p><a href="default.asp"><%=lang(cnnDB, "AdministrativeMenu")%></a></p>
+    <div class="lhd-wrapper">
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px">
+        <div class="lhd-page-title" style="margin:0">
+          <span class="title-icon">&#127760;</span>
+          <%=lang(cnnDB, "Languages")%>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <a class="btn btn-secondary" href="default.asp">&larr; <%=lang(cnnDB, "AdministrativeMenu")%></a>
+          <form method="post" action="modify.asp?mtype=6" style="margin:0">
+            <button type="submit" class="btn btn-primary">&#10133; <%=lang(cnnDB, "AddNew")%>&nbsp;<%=lang(cnnDB, "Language")%></button>
+          </form>
+        </div>
+      </div>
+
+      <div class="lhd-card lhd-card-flush">
+        <div style="overflow-x:auto">
+          <table class="lhd-table">
+            <thead>
+              <tr>
+                <th><%=lang(cnnDB, "Language")%></th>
+                <th><%=lang(cnnDB, "Localized")%></th>
+                <th class="col-actions"><%=lang(cnnDB, "Modify")%></th>
+              </tr>
+            </thead>
+            <tbody>
+            <%
+              Do While Not rstLanguage.EOF
+            %>
+              <tr>
+                <td><strong><% = Server.HTMLEncode(rstLanguage("LangName") & "") %></strong></td>
+                <td><% = Server.HTMLEncode(rstLanguage("Localized") & "") %></td>
+                <td class="col-actions">
+                  <% If rstLanguage("id") <> 1 Then %>
+                    <a class="btn btn-secondary btn-sm" href="modify.asp?mtype=6&amp;id=<% = rstLanguage("id") %>">&#9998; <%=lang(cnnDB, "Edit")%></a>
+                    <a class="btn btn-secondary btn-sm" href="confdelete.asp?mtype=6&amp;id=<% = rstLanguage("id") %>">&#128465; <%=lang(cnnDB, "Delete")%></a>
+                  <% End If %>
+                  <a class="btn btn-secondary btn-sm" href="viewlangstring.asp?lang_id=<% = rstLanguage("id") %>">&#128292; <%=lang(cnnDB, "Strings")%></a>
+                </td>
+              </tr>
+            <%
+              rstLanguage.MoveNext
+              Loop
+            %>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <%

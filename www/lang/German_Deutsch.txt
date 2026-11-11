@@ -321,6 +321,7 @@ Securitylevel=Securitylevel
 Securitylevels=Securitylevels
 SelectCategory=Kategorie wählen
 SelectDepartment=Abteilung auswählen
+SelectAnExistingUser=Vorhandenen Benutzer auswählen
 SelectUser=Benutzer auswählen
 SendTestEmail=Test email an HelpdeskAdmin senden
 ShowAll=Alle anzeigen

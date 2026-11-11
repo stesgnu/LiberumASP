@@ -1,8 +1,8 @@
-<%@ LANGUAGE="VBScript" %>
+<%@ LANGUAGE="VBScript" CODEPAGE="65001" %>
 <% 
   Option Explicit
-  'Buffer the response, so Response.Expires can be used
   Response.Buffer = TRUE
+  Response.Expires = -1
 %>
 
 <?xml version="1.0"?>
@@ -14,12 +14,10 @@
   Liberum Help Desk comes with ABSOLUTELY NO WARRANTY
   Please view the license.html file for the full GNU General Public License.
 
-  Filename: details.asp
+  Filename: details.asp (user)
   Date:     $Date: 2002/06/15 23:49:20 $
   Version:  $Revision: 1.50.4.1 $
-  Purpose:  This page displays the details of a problem.  The problem id is taken
-  is an input from the URL. (details.asp?id=xx)  If the problem is not closed, the
-  update form posts to update.asp.
+  Purpose:  Displays details of a problem.
   -->
 
   <!-- 	#include file = "../public.asp" -->
@@ -32,18 +30,27 @@
   %>
 
   <head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta charset="utf-8">
     <title><%=lang(cnnDB, "HelpDesk")%>&nbsp;-&nbsp;<%=lang(cnnDB, "ProblemDetails")%></title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" type="text/css" href="../default.css">
+    <style>
+      @media print {
+        .no-print { display: none !important; }
+        .lhd-detail-layout { grid-template-columns: 1fr !important; }
+      }
+    </style>
   </head>
   <body>
 
     <%
       ' See if authenticated
       Call CheckUser(cnnDB, sid)
-      ' Get the username
 
-      dim uid, ufname
+      Dim uid, ufname
       uid = Usr(cnnDB, sid, "uid")
+
       ' Get the problem ID
       Dim id
       id = Cint(Request.QueryString("id"))
@@ -54,12 +61,10 @@
         id = Cint(Request.Form("id"))
       End If
 
-      ' Generate a query, making sure to search for id and uid so a user
-      ' cannot view someone else's problem.
       Dim queryStr, rstProblem, rstSolution
 
       queryStr = _
-      "SELECT p.id, p.uid, p.uemail, p.uphone, p.ulocation, d.dname, p.start_date, p.due_date, p.status, s.sname, " & _
+      "SELECT p.id, p.uid, p.uemail, p.uphone, p.ulocation, d.dname, p.start_date, p.status, s.sname, " & _
       "p.close_date, c.cname, pri.pname, r.uid As ruid, r.email1 As remail, r.fname, p.title, p.solution, p.description " & _
       "FROM ((((problems AS p " & _
       "INNER JOIN departments AS d ON p.department = d.department_id) " & _
@@ -71,243 +76,208 @@
 
       Set rstProblem = SQLQuery(cnnDB, queryStr)
 
-      ' If no results are returned, display an error
       If rstProblem.EOF Then
         cnnDB.Close
         Call DisplayError(3, lang(cnnDB, "ProblemID") & "&nbsp;" & id & "&nbsp;" & lang(cnnDB, "wasnotfoundinthedatabase") & ".")
       End If
 
-      ' If it is a closed problem, get the solution
+      ' Get solution if closed
       Set rstSolution = SQLQuery(cnnDB, "SELECT solution FROM problems WHERE id=" & id & " AND uid='" & uid & "'")
 
-      ' Get the Notes for this problem
+      ' Get Notes
       Dim rstNotes
       Set rstNotes = SQLQuery(cnnDB, "SELECT id, addDate, uid, private, [note] FROM tblNotes WHERE id=" & id & " AND private=0 ORDER BY addDate ASC")
 
-      ' Display The problem info, and if OPEN allow some updates
+      Dim isClosed
+      isClosed = (rstProblem("status") >= 100)
+
+      Call DisplayHeader(cnnDB, sid)
     %>
 
-    <div align="center">
-      <table Class="Normal">
-        <tr>
-          <td colspan="2" align="right">
-            <em>*</em> = <%=lang(cnnDB, "Required")%> |
-            <a href="print.asp?id=<% = id %>" target="printwindow"><%=lang(cnnDB, "PrinterFriendly")%></a>
-          </td>
-        </tr>
-        <tr class="Head1">
-          <td colspan="2">
-            <%=lang(cnnDB, "DetailsforProblem")%>&nbsp;<% = id %>
-          </td>
-        </tr>
-        <tr class="Body1">
-          <td colspan="2">
-            <table class="Normal" border="0" cellspacing="0">
-			  <tr>
-			    <td colspan="2">
-					<% If rstProblem("status") = Cfg(cnnDB, "CloseStatus") Then %>
-					  <div align="center">
-						<b><a href="../rep/details.asp?id=<% = id %>&reopen=1"><%=lang(cnnDB, "ReopenProblem")%></a></b>
-					  </div>
-					<% End If %>
-				</td>
-			  </tr>
-              <tr>
-                <td width="125" valign="top">
-                  <b><%=lang(cnnDB, "ProblemID")%>:</b>
-                </td>
-                <td>
-                  <% = id %>
-                </td>
-              </tr>
-              <tr>
-                <td>
-                  <b><%=lang(cnnDB, "UserName")%>:</b>
-                </td>
-                <td>
-                  <% = uid %>
-                </td>
-              </tr>
-              <tr>
-                <td>
-                  <b><%=lang(cnnDB, "EMail")%>:</b>
-                </td>
-                <td>
-                  <% = rstProblem("uemail") %>
-                </td>
-              </tr>
-              <tr>
-                <td>
-                  <b><%=lang(cnnDB, "Phone")%>:</b>
-                </td>
-                <td>
-                  <% = rstProblem("uphone") %>
-                </td>
-              </tr>
-              <tr>
-                <td>
-                  <b><%=lang(cnnDB, "Location")%>:</b>
-                </td>
-                <td>
-                  <% = rstProblem("ulocation") %>
-                </td>
-              </tr>
-              <tr>
-                <td>
-                  <b><%=lang(cnnDB, "StartDate")%>:</b>
-                </td>
-                <td>
-                  <% = DisplayDate(rstProblem("start_date"), lhdDateTime) %>
-                </td>
-              </tr>
-              <tr>
-                <td>
-                  <b><%=lang(cnnDB, "DueDate")%>:</b>
-                </td>
-                <td>
-                  <% = DisplayDate(rstProblem("due_date"), lhdDateOnly) %>
-                </td>
-              </tr>
-              <% If rstProblem("status") = Cfg(cnnDB, "CloseStatus") Then %>
-                <tr>
-                  <td>
-                    <b><%=lang(cnnDB, "CloseDate")%>:</b>
-                  </td>
-                  <td>
-                    <% = DisplayDate(rstProblem("close_date"), lhdDateTime) %>
-                  </td>
-                </tr>
-              <% End If %>
-              <tr>
-                <td>
-                  <b><%=lang(cnnDB, "Department")%>:</b>
-                </td>
-                <td>
-                  <% = rstProblem("dname") %>
-                </td>
-              </tr>
-              <tr>
-                <td>
-                  <b><%=lang(cnnDB, "Category")%>:</b>
-                </td>
-                <td>
-                  <% = rstProblem("cname") %>
-                </td>
-              </tr>
-              <tr>
-                <td>
-                  <b><%=lang(cnnDB, "Priority")%>:</b>
-                </td>
-                <td>
-                  <% = rstProblem("pname") %>
-                </td>
-              </tr>
-              <tr>
-                <td>
-                  <b><%=lang(cnnDB, "AssignedTo")%>:</b>
-                </td>
-                <td>
-                  <a href="mailto:<% = rstProblem("remail") %>?Subject=<%=lang(cnnDB, "HelpDesk")%>:&nbsp;<%=lang(cnnDB, "Problem")%>&nbsp;<% = id %>"><% = rstProblem("fname") %></a>
-                </td>
-              </tr>
-              <tr>
-                <td>
-                  <b><%=lang(cnnDB, "Status")%>:</b>
-                </td>
-                <td>
-                  <% = rstProblem("sname") %>
-                </td>
-              </tr>
-            </table>
-		  </td>
-        </tr>
-		<tr class="Head2">
-		  <td>
-		    <%=lang(cnnDB, "ProblemInformation")%>:
-		  </td>
-		</tr>
-        <tr class="Body1">
-          <td>
-            <form>
-              <b><%=lang(cnnDB, "Title")%>:</b><br>
-              <input type="text" size="50" readonly name="display_title" value="<% = rstProblem("title") %>">
-              <p>
-              <b><%=lang(cnnDB, "Description")%>:</b><br>
-              <textarea readonly name="display_desc" rows="8" cols="80"><% = rstProblem("description") %></textarea>
-            </form>
-          </td>
-        </tr>
-        <tr class="Head2">
-          <td>
-            <%=lang(cnnDB, "Notes")%>:
-          </td>
-        </tr>
-        <tr class="Body1">
-          <td colspan="2" >
-           <% If rstNotes.EOF Then 
-               Response.Write lang(cnnDB, "NoAvailableNotes")
-              Else
-              Do While Not rstNotes.EOF
-              
-                Response.Write ("<b>[") & _
-                  (DisplayDate(rstNotes("addDate"), lhdDateTime)) & _
-                  (" - " & rstNotes("uid") & "]") & _
-                  ("</b><br />" & vbNewLine) & _
-                  (Replace(rstNotes("note"), vbNewLine, "<br />")) & _
-                  ("<p>&nbsp;</p>" & vbNewLine)
+    <div class="lhd-wrapper">
 
-                rstNotes.MoveNext
-              Loop
-              End If %>
-          </td>
-        </tr>
-        <% If rstProblem("status") <> Cfg(cnnDB, "CloseStatus") Then %>
-          <form method="post" action="update.asp">
-            <input type="hidden" name="id" value="<% = id %>">
-            <tr class="Head2">
-              <td>
-                <%=lang(cnnDB, "EnterAdditionalNotes")%>:
-              </td>
-            </tr>
-            <tr class="Body1">
-              <td>
-                <div align="center">
-                  <textarea name="notes" rows="8" cols="80" wrap="on"></textarea>
-                </div>
-              </td>
-            </tr>
-            <tr class="Head2">
-              <td>
-                <div align="center">
-                  <input type="submit" value="<%=lang(cnnDB, "UpdateProblem")%>" name="B1">&nbsp;<input type="reset" value="<%=lang(cnnDB, "ClearNotes")%>" name="B2">
-                </div>
-              </td>
-            </tr>
-          </form>
-        <% Else %>
-          <tr class="Head2">
-            <td>
-              <%=lang(cnnDB, "Solution")%>:
-            </td>
-          </tr>
-          <tr class="Body1">
-            <td>
-              <div align="center">
-                <form><textarea name="display_solution" rows="8" cols="80" wrap="on"><% = rstSolution("solution") %></textarea></form>
+      <!-- Breadcrumb y acciones -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px" class="no-print">
+        <div class="lhd-page-title" style="margin:0">
+          <span class="title-icon">&#128203;</span>
+          <%=lang(cnnDB, "DetailsforProblem")%>&nbsp;#<% = id %>
+          &nbsp;<% = StatusBadge(rstProblem("sname")) %>
+          &nbsp;<% = PriorityBadge(rstProblem("pname")) %>
+        </div>
+        <div style="display:flex;gap:8px">
+          <a class="btn btn-secondary btn-sm" href="view.asp">&#8592; Volver</a>
+          <a class="btn btn-secondary btn-sm" href="print.asp?id=<% = id %>" target="printwindow">&#128424; <%=lang(cnnDB, "PrinterFriendly")%></a>
+          <% If isClosed Then %>
+            <a class="btn btn-primary btn-sm" href="../rep/details.asp?id=<% = id %>&reopen=1">
+              &#8635; <%=lang(cnnDB, "ReopenProblem")%>
+            </a>
+          <% End If %>
+        </div>
+      </div>
+
+      <% Call ShowToast(cnnDB) %>
+
+      <div class="lhd-detail-layout">
+
+        <!-- Columna principal -->
+        <div>
+          <!-- Titulo y descripcion -->
+          <div class="lhd-card">
+            <div class="section-header">&#128221; <%=lang(cnnDB, "ProblemInformation")%></div>
+
+            <div class="form-group">
+              <label class="form-label"><%=lang(cnnDB, "Title")%></label>
+              <input type="text" class="form-control" value="<% = FixTildes(Server.HTMLEncode(rstProblem("title"))) %>" readonly>
+            </div>
+
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label"><%=lang(cnnDB, "Description")%></label>
+              <div class="lhd-rich" style="background:#F7FAFC;border:1px solid #CBD5E0;border-radius:4px;padding:14px;
+                          font-size:13px;line-height:1.7;word-break:break-word;min-height:120px">
+                <% = LhdRichToDisplay(rstProblem("description")) %>
               </div>
-            </td>
-          </tr>
-        <% End If %>
-      </table>
-      <p><a href="view.asp"><%=lang(cnnDB, "ProblemListing")%></a></p>
-   </div>
+              <% = LhdAttachmentList(cnnDB, id) %>
+            </div>
+          </div>
+
+          <!-- Notas / Timeline -->
+          <div class="lhd-card">
+            <div class="section-header">&#128172; <%=lang(cnnDB, "Notes")%></div>
+
+            <% If rstNotes.EOF Then %>
+              <p style="color:#718096;font-size:13px"><%=lang(cnnDB, "NoAvailableNotes")%></p>
+            <% Else %>
+              <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:10px">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="lhdNotesToggle(true)">Expandir todas</button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="lhdNotesToggle(false)">Contraer todas</button>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <%
+                  Do While Not rstNotes.EOF
+                %>
+                  <details class="lhd-note" style="background:#f8fafc;border-left:4px solid var(--color-primary,#0057B8);border-radius:0 6px 6px 0">
+                    <summary style="cursor:pointer;padding:10px 16px;font-size:13px;color:#2d3748">
+                      &#128100; <% = Server.HTMLEncode(NoteAuthorName(cnnDB, rstNotes("uid"))) %>
+                      &nbsp;&mdash;&nbsp;
+                      &#128336; <% = DisplayDate(rstNotes("addDate"), lhdDateTime) %>
+                    </summary>
+                    <div style="padding:0 16px 12px 16px;line-height:1.5;white-space:pre-wrap;color:#2d3748">
+                      <% = Server.HTMLEncode(rstNotes("note")) %>
+                    </div>
+                  </details>
+                <%
+                    rstNotes.MoveNext
+                  Loop
+                %>
+              </div>
+              <script type="text/javascript">
+                function lhdNotesToggle(abrir) {
+                  var items = document.querySelectorAll('details.lhd-note');
+                  for (var i = 0; i < items.length; i++) { items[i].open = abrir; }
+                }
+              </script>
+            <% End If %>
+            <% rstNotes.Close %>
+
+            <!-- Solucion si cerrado -->
+            <% If isClosed Then %>
+              <div class="section-subheader">&#10004; <%=lang(cnnDB, "Solution")%></div>
+              <div class="lhd-rich" style="background:#F0FFF4;border:1px solid #9AE6B4;border-radius:4px;padding:14px;
+                          font-size:13px;line-height:1.7;word-break:break-word">
+                <% = LhdRichToDisplay(rstSolution("solution")) %>
+              </div>
+            <% End If %>
+            <% rstSolution.Close %>
+
+            <!-- Formulario para agregar nota si no cerrado -->
+            <% If Not isClosed Then %>
+              <div class="section-subheader no-print">&#10133; <%=lang(cnnDB, "EnterAdditionalNotes")%></div>
+              <form method="post" action="update.asp" class="no-print">
+                <input type="hidden" name="id" value="<% = id %>">
+                <div class="form-group">
+                  <textarea class="form-control" name="notes" rows="5"
+                            placeholder="Agrega mas informacion sobre este ticket..."></textarea>
+                </div>
+                <div style="display:flex;gap:8px;justify-content:flex-end">
+                  <button type="reset" class="btn btn-secondary btn-sm">&#10006; <%=lang(cnnDB, "ClearNotes")%></button>
+                  <button type="submit" class="btn btn-primary">&#128228; <%=lang(cnnDB, "UpdateProblem")%></button>
+                </div>
+              </form>
+            <% End If %>
+          </div>
+        </div>
+
+        <!-- Columna lateral: metadatos -->
+        <div class="lhd-detail-meta">
+          <div class="lhd-detail-meta-header">&#8505; Informacion del ticket</div>
+          <table>
+            <tr>
+              <td>ID</td>
+              <td><strong>#<% = id %></strong></td>
+            </tr>
+            <tr>
+              <td><%=lang(cnnDB, "Status")%></td>
+              <td><% = StatusBadge(rstProblem("sname")) %></td>
+            </tr>
+            <tr>
+              <td><%=lang(cnnDB, "Priority")%></td>
+              <td><% = PriorityBadge(rstProblem("pname")) %></td>
+            </tr>
+            <tr>
+              <td><%=lang(cnnDB, "AssignedTo")%></td>
+              <td>
+                <a href="mailto:<% = rstProblem("remail") %>?Subject=Help Desk: Ticket #<% = id %>">
+                  &#128100; <% = Server.HTMLEncode(rstProblem("fname")) %>
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td><%=lang(cnnDB, "Department")%></td>
+              <td><% = Server.HTMLEncode(rstProblem("dname")) %></td>
+            </tr>
+            <tr>
+              <td><%=lang(cnnDB, "Category")%></td>
+              <td><% = Server.HTMLEncode(rstProblem("cname")) %></td>
+            </tr>
+            <tr>
+              <td><%=lang(cnnDB, "UserName")%></td>
+              <td><% = Server.HTMLEncode(LhdUserDisplayName(cnnDB, uid)) %></td>
+            </tr>
+            <tr>
+              <td><%=lang(cnnDB, "EMail")%></td>
+              <td><a href="mailto:<% = rstProblem("uemail") %>"><% = rstProblem("uemail") %></a></td>
+            </tr>
+            <% If Len(Trim(rstProblem("uphone"))) > 0 Then %>
+            <tr>
+              <td><%=lang(cnnDB, "Phone")%></td>
+              <td><% = rstProblem("uphone") %></td>
+            </tr>
+            <% End If %>
+            <% If Len(Trim(rstProblem("ulocation"))) > 0 Then %>
+            <tr>
+              <td><%=lang(cnnDB, "Location")%></td>
+              <td><% = rstProblem("ulocation") %></td>
+            </tr>
+            <% End If %>
+            <tr>
+              <td><%=lang(cnnDB, "StartDate")%></td>
+              <td><% = DisplayDate(rstProblem("start_date"), lhdDateTime) %></td>
+            </tr>
+            <% If isClosed Then %>
+            <tr>
+              <td><%=lang(cnnDB, "CloseDate")%></td>
+              <td>&#10004; <% = DisplayDate(rstProblem("close_date"), lhdDateTime) %></td>
+            </tr>
+            <% End If %>
+          </table>
+        </div>
+
+      </div>
+
+    </div>
 
     <%
-      ' Close Results
       rstProblem.Close
-      rstNotes.Close
-      rstSolution.Close
-
       Call DisplayFooter(cnnDB, sid)
       cnnDB.Close
     %>

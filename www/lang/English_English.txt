@@ -318,6 +318,7 @@ Securitylevel=Securitylevel
 Securitylevels=Securitylevels
 SelectCategory=Select Category
 SelectDepartment=Select Department
+SelectAnExistingUser=Select an existing user
 SelectUser=Select User
 SendTestEmail=Send test e-mail to Help Desk Admin
 ShowAll=Show All

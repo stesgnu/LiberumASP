@@ -314,6 +314,7 @@ Securitylevel=Niveau de sécurité
 Securitylevels=Niveau de sécurité
 SelectCategory=Choisissez la catégorie 
 SelectDepartment=Choisissez le département 
+SelectAnExistingUser=Sélectionnez un utilisateur existant
 SelectUser=Choisissez l'utilisateur 
 SendTestEmail=Envoyez un courriel d'essai à l'administrateur du  service 
 ShowAll=Montrez tous 

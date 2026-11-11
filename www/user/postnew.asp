@@ -1,7 +1,6 @@
-<%@ LANGUAGE="VBScript" %>
+<%@ LANGUAGE="VBScript" CODEPAGE="65001" %>
 <% 
   Option Explicit
-  'Buffer the response, so Response.Expires can be used
   Response.Buffer = TRUE
 %>
 
@@ -17,8 +16,7 @@
   Filename: postnew.asp
   Date:     $Date: 2002/06/15 23:49:20 $
   Version:  $Revision: 1.51.4.1 $
-  Purpose:  Takes the input from new.asp, checks for errors and enters the
-  problem into the database.
+  Purpose:  Takes input from new.asp, validates, inserts problem, shows modern feedback.
   -->
 
   <!-- 	#include file = "../public.asp" -->
@@ -30,6 +28,7 @@
 
   <head>
     <title><%=lang(cnnDB, "HelpDesk")%>&nbsp;-&nbsp;<%=lang(cnnDB, "ProblemSubmitted")%></title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" type="text/css" href="../default.css">
   </head>
   <body>
@@ -38,249 +37,189 @@
       ' See if authenticated
       Call CheckUser(cnnDB, sid)
 
-      ' Get the information from the form fields
+      ' Get form fields
       Dim uid, uemail, uphone, ulocation, category, department, title, description, entered_by
       Dim kb, duedate, priority
       
-      uid = Request.Form("uid")
-      uemail = Request.Form("uemail")
-      uphone = Request.Form("uphone")
-      ulocation = Request.Form("ulocation")
+      uid = CleanInputText(Request.Form("uid"))
+      uemail = CleanInputText(Request.Form("uemail"))
+      uphone = CleanInputText(Request.Form("uphone"))
+      ulocation = CleanInputText(Request.Form("ulocation"))
       category = Cint(Request.Form("category"))
-      department = Request.Form("department")
-      title = Request.Form("title")
-      description = Request.Form("description")
+      department = SafeCLng(Request.Form("department"))
+      title = CleanInputText(Request.Form("title"))
+      description = LhdSanitizeHtml(CleanInputText(Request.Form("description")))
+      Dim attachToken
+      attachToken = Request.Form("attachToken")
       entered_by = sid
       kb = 0
       duedate = ConvertFormattedDate(Request.Form("duedate"))
       priority = Cint(Request.Form("priority"))
 
-    ' Check for required fields (uemail, category, department, title, description)
-
-      if InStr(uemail, "@")=0 Then
+      ' Validation
+      If InStr(uemail, "@") = 0 Then
         cnnDB.Close
         Call DisplayError(1, lang(cnnDB, "Emailaddress"))
-      End if
-
-      if category = 0 Then
-        cnnDB.Close
-        Call DisplayError(1, lang(cnnDB, "Category"))
-      End if
-
-      if department = 0 Then
-        cnnDB.Close
-        Call DisplayError(1, lang(cnnDB, "Department"))
-      End if
-
-      if priority = 0 Then
-        cnnDB.Close
-        Call DisplayError(1, lang(cnnDB, "Priority"))
-      end if
-
-      If Not IsDate(duedate) Then
-        Call DisplayError(1, lang(cnnDB, "DueDate"))
       End If
 
-      if Len(title)=0 Then
+      If category = 0 Then
+        cnnDB.Close
+        Call DisplayError(1, lang(cnnDB, "Category"))
+      End If
+
+      If department = 0 Then
+        cnnDB.Close
+        Call DisplayError(1, lang(cnnDB, "Department"))
+      End If
+
+      If priority = 0 Then
+        cnnDB.Close
+        Call DisplayError(1, lang(cnnDB, "Priority"))
+      End If
+
+      If Not IsDate(duedate) Then
+        duedate = DateAdd("d", 1, Now())
+      End If
+
+      If Len(title) = 0 Then
         cnnDB.Close
         Call DisplayError(1, lang(cnnDB, "Title"))
-      Elseif Len(title) > 255 Then
+      ElseIf Len(title) > 255 Then
         title = Trim(title)
         title = Left(title, 255)
-      End if
+      End If
 
-      if Len(description)=0 Then
+      If Not LhdRichHasContent(description) Then
         cnnDB.Close
         Call DisplayError(1, lang(cnnDB, "Description"))
-      End if
+      End If
 
-    ' Get missing variables to enter problem
       Dim id, status, start_date, rep, time_spent
       status = Cfg(cnnDB, "DefaultStatus")
       time_spent = 0
       start_date = Now
 
-      ' Get the department name by querying on department_id
       Dim dname, rstDept
-      Set rstDept = SQLQuery(cnnDB, "SELECT dname FROM departments WHERE department_id=" & Request.Form("department"))
+      Set rstDept = SQLQuery(cnnDB, "SELECT dname FROM departments WHERE department_id=" & department)
       dname = rstDept("dname")
 
-      ' Get the category name by querying on category_id
       Dim cname, catRes
-      Set catRes = SQLQuery(cnnDB, "SELECT cname, rep_id FROM categories WHERE category_id=" & Request.Form("category"))
+      Set catRes = SQLQuery(cnnDB, "SELECT cname, rep_id FROM categories WHERE category_id=" & category)
       rep = catRes("rep_id")
       cname = catRes("cname")
 
-      ' Get the priority name
       Dim pname, priRes
       Set priRes = SQLQuery(cnnDB, "SELECT pname FROM priority WHERE priority_id=" & priority)
       pname = priRes("pname")
       priRes.Close
 
-    ' Get the problem ID number then immediately update it
       id = GetUnique(cnnDB, "problems")
 
-    ' Clean up variables
-      uemail = Left(Trim(uemail),50)
-      uemail = Replace(uemail,"'","''")
-      uphone = Left(Trim(uphone),50)
-      uphone = Replace(uphone,"'","''")
-      ulocation = Left(Trim(ulocation),50)
-      ulocation = Replace(ulocation,"'","''")
-      title = Replace(title,"'","''")
-      description = Replace(description,"'","''")
+      uemail = Left(Trim(uemail), 50)
+      uemail = Replace(uemail, "'", "''")
+      uphone = Left(Trim(uphone), 50)
+      uphone = Replace(uphone, "'", "''")
+      ulocation = Left(Trim(ulocation), 50)
+      ulocation = Replace(ulocation, "'", "''")
+      title = Replace(title, "'", "''")
+      description = Replace(description, "'", "''")
 
-    ' All data is present
-    ' Write problem into database
       Dim strProblemQry, rstProbInsert
       strProblemQry = "INSERT INTO problems (id, uid, uemail, uphone, ulocation, entered_by, " & _
-        "category, department, title, description, priority, status, start_date, due_date, rep, time_spent, kb) " & _
+        "category, department, title, description, priority, status, start_date, rep, time_spent, kb) " & _
         "VALUES (" & id & ",'" & uid & "','" & uemail & "','" & uphone & "','" & _
         ulocation & "'," & entered_by & "," & category & "," & department & ",'" & title & "','" & _
-        description & "'," & priority & "," & status & "," & SQLDate(start_date, lhdAddSQLDelim) & "," & SQLDate(duedate, lhdAddSQLDelim) & "," & rep & "," & time_spent & _
+        description & "'," & priority & "," & status & "," & SQLDate(start_date, lhdAddSQLDelim) & "," & rep & "," & time_spent & _
         "," & kb & ")"
 
       Set rstProbInsert = SQLQuery(cnnDB, strProblemQry)
+      Call LhdLinkAttachments(cnnDB, attachToken, id)
 
-    ' Send mail to the user and support rep if email is enabled.
-    Call eMessage(cnnDB, "usernew", id, uemail)
+      ' Notifications
+      Call eMessage(cnnDB, "usernew", id, uemail)
+      Call eMessage(cnnDB, "repnew", id, Usr(cnnDB, rep, "email1"))
 
-    Call eMessage(cnnDB, "repnew", id, Usr(cnnDB, rep, "email1"))
+      If (priority >= Cfg(cnnDB, "EnablePager")) And (Len(Usr(cnnDB, rep, "email2")) > 0) Then
+        Call eMessage(cnnDB, "reppager", id, Usr(cnnDB, rep, "email2"))
+      End If
 
-    'Page Rep if enabled
-    If (priority >= Cfg(cnnDB, "EnablePager")) And (Len(Usr(cnnDB, rep, "email2")) > 0) Then
-      Call eMessage(cnnDB, "reppager", id, Usr(cnnDB, rep, "email2"))
-    End If
+      title = Replace(title, "''", "'")
+      description = Replace(description, "''", "'")
 
-    ' Convert the strings back to display them
-      title = Replace(title,"''","'")
-      description = Replace(description,"''","'")
+      Call LhdToast("success", lang(cnnDB, "Problem") & " #" & id & " " & lang(cnnDB, "Submitted"))
+      Call DisplayHeader(cnnDB, sid)
     %>
 
-    <div align="center">
-      <table class="Wide">
-        <tr class="Head1">
-          <td>
-            <%=lang(cnnDB, "Problem")%>&nbsp;<% = id %>&nbsp;<%=lang(cnnDB, "Submitted")%>
-          </td>
-        </tr>
-        <tr class="Body1">
-          <td>
-            <table class="Wide">
-              <tr>
-                <td width="125">
-                  <b><%=lang(cnnDB, "ProblemID")%>:</b>
-                </td>
-                <td>
-                  <% = id %>
-                </td>
-              </tr>
-              <tr>
-                <td>
-                  <b><%=lang(cnnDB, "UserName")%>:</b>
-                </td>
-                <td>
-                  <% = uid %>
-                </td>
-              </tr>
-              <tr>
-                <td>
-                  <b><%=lang(cnnDB, "EMail")%>:</b>
-                </td>
-                <td>
-                  <% = uemail %>
-                </td>
-              </tr>
-              <tr>
-                <td>
-                  <b><%=lang(cnnDB, "Phone")%>:</b>
-                </td>
-                <td>
-                  <% = uphone %>
-                </td>
-              </tr>
-              <tr>
-                <td>
-                  <b><%=lang(cnnDB, "Location")%>:</b>
-                </td>
-                <td>
-                  <% = ulocation %>
-                </td>
-              </tr>
-              <tr>
-                <td>
-                  <b><%=lang(cnnDB, "StartDate")%>:</b>
-                </td>
-                <td>
-                  <% = DisplayDate(start_date,lhdDateTime) %>
-                </td>
-              </tr>
-              <tr>
-                <td>
-                  <b><%=lang(cnnDB, "DueDate")%>:</b>
-                </td>
-                <td>
-                  <% = DisplayDate(duedate,lhdDateOnly) %>
-                </td>
-              </tr>
-              <tr>
-                <td>
-                  <b><%=lang(cnnDB, "Department")%>:</b>
-                </td>
-                <td>
-                  <% = rstDept("dname") %>
-                </td>
-              </tr>
-              <tr>
-                <td>
-                  <b><%=lang(cnnDB, "Category")%>:</b>
-                </td>
-                <td>
-                  <% = catRes("cname") %>
-                </td>
-              </tr>
-              <tr>
-                <td>
-                  <b><%=lang(cnnDB, "Priority")%>:</b>
-                </td>
-                <td>
-                  <% = pname %>
-                </td>
-              </tr>
-              <tr>
-                <td>
-                  <b><%=lang(cnnDB, "AssignedTo")%>:</b>
-                </td>
-                <td>
-                  <a href="mailto:<% = Usr(cnnDB, rep, "email1") %>?Subject=<%=lang(cnnDB, "HELPDESK")%>: <%=lang(cnnDB, "Problem")%> <% = id %>"><% = Usr(cnnDB, rep, "fname") %></a>
-                </td>
-              </tr>
-              <tr>
-                <td>
-                  <b><%=lang(cnnDB, "Title")%>:</b>
-                </td>
-                <td>
-                  <% = title %>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-        <tr class="Head2">
-          <td>
-            <%=lang(cnnDB, "Description")%>:
-          </td>
-        </tr>
-        <tr class="Body1">
-          <td>
-            <center><form><textarea name="display_desc" rows="10" cols="80"><% = description %></textarea></form></center>
-          </td>
-        </tr>
-      </table>
+    <div class="lhd-wrapper">
+
+      <div class="lhd-card" style="text-align:center;padding:36px;margin-bottom:24px">
+        <div style="font-size:48px;color:var(--color-success);margin-bottom:12px">&#10004;</div>
+        <h2 style="margin:0 0 8px"><%=lang(cnnDB, "Problem")%>&nbsp;#<% = id %>&nbsp;<%=lang(cnnDB, "Submitted")%></h2>
+        <p style="color:var(--color-muted);font-size:14px;max-width:500px;margin:0 auto 20px">
+          Tu solicitud fue registrada con &eacute;xito y asignada a nuestro equipo de soporte.
+        </p>
+        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+          <a class="btn btn-primary" href="details.asp?id=<% = id %>">
+            &#128065; Ver Detalles del Ticket
+          </a>
+          <a class="btn btn-secondary" href="new.asp">
+            &#10133; Enviar Otro Problema
+          </a>
+          <a class="btn btn-secondary" href="view.asp">
+            &#128203; Mis Tickets
+          </a>
+        </div>
+      </div>
+
+      <div class="lhd-detail-layout">
+        <div class="lhd-card">
+          <div class="section-header">&#128221; <%=lang(cnnDB, "ProblemInformation")%></div>
+          <div class="form-group">
+            <label class="form-label"><%=lang(cnnDB, "Title")%></label>
+            <input type="text" class="form-control" value="<% = Server.HTMLEncode(title) %>" readonly>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label"><%=lang(cnnDB, "Description")%></label>
+            <div style="background:#F7FAFC;border:1px solid var(--color-border-light);border-radius:var(--radius-sm);padding:14px;font-size:13px;line-height:1.7;white-space:pre-wrap">
+              <% = LhdRichToDisplay(description) %>
+            </div>
+          </div>
+        </div>
+
+        <div class="lhd-detail-meta">
+          <div class="lhd-detail-meta-header">&#8505; Resumen del Ticket</div>
+          <table>
+            <tr>
+              <td>Ticket ID</td>
+              <td><strong>#<% = id %></strong></td>
+            </tr>
+            <tr>
+              <td>Prioridad</td>
+              <td><% = PriorityBadge(pname) %></td>
+            </tr>
+            <tr>
+              <td>Departamento</td>
+              <td><% = Server.HTMLEncode(dname) %></td>
+            </tr>
+            <tr>
+              <td>Categor&iacute;a</td>
+              <td><% = Server.HTMLEncode(cname) %></td>
+            </tr>
+            <tr>
+              <td>Asignado a</td>
+              <td><% = Server.HTMLEncode(Usr(cnnDB, rep, "fname")) %></td>
+            </tr>
+            <tr>
+              <td>Fecha ingreso</td>
+              <td><% = DisplayDate(start_date, lhdDateTime) %></td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
     </div>
 
     <%
-      ' Close records
       rstDept.Close
       catRes.Close
 

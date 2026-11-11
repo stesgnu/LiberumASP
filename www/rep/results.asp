@@ -1,4 +1,4 @@
-<%@ LANGUAGE="VBScript" %>
+<%@ LANGUAGE="VBScript" CODEPAGE="65001" %>
 <% 
   Option Explicit
   'Buffer the response, so Response.Expires can be used
@@ -37,17 +37,18 @@
   <%
     ' Check if user has permissions for this page
     Call CheckRep(cnnDB, sid)
+	Call DisplayHeader(cnnDB, sid)
 
     ' Get the search fields from the form.
     Dim uid, id, rep, category, department, status, priority, order
 
-    uid = Trim(Request.Form("uid"))
-    rep = Cint(Request.Form("rep"))
-    category = Cint(Request.Form("category"))
-    department = Cint(Request.Form("department"))
-    status = Cint(Request.Form("status"))
-    priority = Cint(Request.Form("priority"))
-    order = Cint(Request.Form("order"))
+    uid = Trim(CleanInputText(Request.Form("uid")))
+    rep = SafeCInt(Request.Form("rep"))
+    category = SafeCInt(Request.Form("category"))
+    department = SafeCInt(Request.Form("department"))
+    status = SafeCInt(Request.Form("status"))
+    priority = SafeCInt(Request.Form("priority"))
+    order = SafeCInt(Request.Form("order"))
 
     id = Trim(Request.Form("id"))
     If IsNumeric(id) Then
@@ -117,7 +118,7 @@
       If status > 0 Then
         whereStr = whereStr & " AND p.status=" & status
       Else
-        whereStr = whereStr & " AND p.status<>" & Cfg(cnnDB, "CloseStatus")
+        whereStr = whereStr & " AND p.status < 100"
       End If
     End If
 
@@ -126,9 +127,9 @@
     End If
 
     ' Add the kewords to the list
-    If Len(Request.Form("keywords")) > 0 Then
+    If Len(CleanInputText(Request.Form("keywords"))) > 0 Then
       Dim strWhere2, keywords, srchRes, varWordList, blAllOff
-      keywords = Trim(Request.Form("keywords"))
+      keywords = Trim(CleanInputText(Request.Form("keywords")))
       varWordList = Split(keywords, " ")
 
       If Request.Form("title") <> "on" And Request.Form("description") <> "on" And Request.Form("solution") <> "on" Then
@@ -238,137 +239,83 @@
       Dim Counter, numToDisplay, startNum
       Counter = 1
       If Len(Request.Form("num")) > 0 Then
-        numToDisplay = CInt(Request.Form("num"))
+        numToDisplay = SafeCInt(Request.Form("num"))
       Else
         numToDisplay = 25
       End if
       If Len(Request.Form("start")) > 0 Then
-        start = CInt(Request.Form("start"))
+        start = SafeCInt(Request.Form("start"))
       Else
         start = 1
       End if
     %>
-    <div align="center">
-      <table class="Wide">
-      <tr class="Head1">
-        <td colspan="6">
-          <%=lang(cnnDB, "SearchResults")%>
-        </td>
-      </tr>
-      <tr class="Head2" align="center">
-        <td nowrap><%=lang(cnnDB, "ID")%></td>
-        <td><%=lang(cnnDB, "Title")%></td>
-        <td nowrap><%=lang(cnnDB, "UserName")%></td>
-        <td nowrap><%=lang(cnnDB, "AssignedTo")%></td>
-        <td nowrap><%=lang(cnnDB, "DateSubmitted")%></td>
-        <td nowrap><%=lang(cnnDB, "Status")%></td>
-      </tr>
-      <%
-        Do While Not (rstProbList.EOF) AND (Counter <= (numToDisplay + start - 1))
-          If Counter >= start Then
-        %>
-          <tr class="Body1" align="center">
-            <td nowrap><% = rstProbList("id") %></td>
-            <td><A HREF="details.asp?id=<% = rstProbList("id") %>"><% = rstProbList("title") %></A></td>
-            <td nowrap><A HREF="mailto:<% = rstProbList("uemail") %>?Subject=HELPDESK: Problem <% = rstProbList("id") %>"><% = rstProbList("uid") %></A></td>
-            <td nowrap><% = rstProbList("ruid") %></td>
-            <td nowrap><% = DisplayDate(rstProbList("start_date"), lhdDateOnly) %></td>
-            <td nowrap><% = rstProbList("sname") %></td>
-          </tr>
-        <%
-          End If
-          Counter = Counter + 1
-          rstProbList.MoveNext
-        Loop
-        Response.Write("</table></center>")
+    <div class="lhd-wrapper">
 
-        ' Calculate prev/next page links
-        Dim startP, StartN
-        startP = start - numToDisplay
-        If startP < 1 Then
-          startP = 1
-        End if
-        startN = start + numToDisplay
-      %>
-        <div align="center">
-        <% If start > 1 Then %>
-          <form method="POST" action="results.asp">
-          <input type="hidden" name="start" value="<% = startP %>">
-          <input type="hidden" name="num" value="<% = numToDisplay %>">
-          <input type="hidden" name="uid" value="<% = uid %>">
-          <input type="hidden" name="id" value="<% = id %>">
-          <input type="hidden" name="rep" value="<% = rep %>">
-          <input type="hidden" name="category" value="<% = category %>">
-          <input type="hidden" name="department" value="<% = department %>">
-          <input type="hidden" name="start_date" value="<% = start_date %>">
-          <input type="hidden" name="end_date" value="<% = end_date %>">
-          <input type="hidden" name="keywords" value="<% = Request("keywords") %>">
-          <input type="hidden" name="title" value="<% = Request("title") %>">
-          <input type="hidden" name="description" value="<% = Request("description") %>">
-          <input type="hidden" name="solution" value="<% = Request("solution") %>">
-          <input type="hidden" name="status" value="<% = status %>">
-          <input type="hidden" name="priority" value="<% = priority %>">
-          <input type="hidden" name="order" value="<% = order %>">
-          <input type="submit" value="<%=lang(cnnDB, "Previous")%>">
-          </form>
-        <% End If
-          If Not (rstProbList.EOF) Then
-        %>
-          <form method="POST" action="results.asp">
-          <input type="hidden" name="start" value="<% = startN %>">
-          <input type="hidden" name="num" value="<% = numToDisplay %>">
-          <input type="hidden" name="uid" value="<% = uid %>">
-          <input type="hidden" name="id" value="<% = id %>">
-          <input type="hidden" name="rep" value="<% = rep %>">
-          <input type="hidden" name="category" value="<% = category %>">
-          <input type="hidden" name="department" value="<% = department %>">
-          <input type="hidden" name="start_date" value="<% = start_date %>">
-          <input type="hidden" name="end_date" value="<% = end_date %>">
-          <input type="hidden" name="keywords" value="<% = Request("keywords") %>">
-          <input type="hidden" name="title" value="<% = Request("title") %>">
-          <input type="hidden" name="description" value="<% = Request("description") %>">
-          <input type="hidden" name="solution" value="<% = Request("solution") %>">
-          <input type="hidden" name="status" value="<% = status %>">
-          <input type="hidden" name="priority" value="<% = priority %>">
-          <input type="hidden" name="order" value="<% = order %>">
-          <input type="submit" value="<%=lang(cnnDB, "Next")%>">
-          </form>
-        <%	End If %>
-        <p>
-        <a href="search.asp"><%=lang(cnnDB, "SearchAgain")%></a>
-        </div>
-      <%
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+    <div class="lhd-page-title" style="margin:0">
+      <span class="title-icon">&#128269;</span>
+      <%=lang(cnnDB, "SearchResults")%>
+    </div>
+    <div style="display:flex;gap:8px">
+      <a class="btn btn-secondary btn-sm" href="search.asp">&larr; Nueva B&uacute;squeda</a>
+      <a class="btn btn-secondary btn-sm" href="view.asp">&#128203; Todos los Tickets</a>
+    </div>
+  </div>
 
-      ' If no results returned:
-      Else
-      %>
-        <div align="center">
-          <table class="Wide">
-            <tr class="Head1">
-              <td colspan="6">
-                <%=lang(cnnDB, "SearchResults")%>
-              </td>
-            </tr>
-            <tr class="Head2" align="center">
-              <td nowrap><%=lang(cnnDB, "ID")%></td>
-              <td><%=lang(cnnDB, "Title")%></td>
-              <td nowrap><%=lang(cnnDB, "UserName")%></td>
-              <td nowrap><%=lang(cnnDB, "AssignedTo")%></td>
-              <td nowrap><%=lang(cnnDB, "DateSubmitted")%></td>
-              <td nowrap><%=lang(cnnDB, "Status")%></td>
-            </tr>
-            <tr class="Body1">
-              <td colspan="6">
-                <div align="center">
-                  <%=lang(cnnDB, "Noresultsfound")%>.
-                </div>
-              </td>
-            </tr>
-          </table>
-          <p>
-          <a href="search.asp"><%=lang(cnnDB, "SearchAgain")%></a>
+  <div class="lhd-card">
+    <div class="section-header">&#128203; Resultados encontrados (m&aacute;x. 100)</div>
+
+    <% If listRes.EOF Then %>
+      <div style="text-align:center;padding:48px 20px;color:#718096">
+        <div style="font-size:40px;margin-bottom:12px">&#128269;</div>
+        <div style="font-size:16px;font-weight:600"><%=lang(cnnDB, "Noresultsfound")%></div>
+        <div style="font-size:13px;margin-top:6px;color:#a0aec0">Intenta con otros criterios de b&uacute;squeda o un rango de fechas m&aacute;s amplio.</div>
+        <div style="margin-top:16px">
+          <a class="btn btn-primary btn-sm" href="search.asp">Volver a Buscar</a>
         </div>
-  <%	End If
+      </div>
+    <% Else %>
+      <div style="overflow-x:auto">
+        <table class="lhd-table">
+          <thead>
+            <tr>
+              <th style="width:70px">ID</th>
+              <th><%=lang(cnnDB, "Title")%></th>
+              <th><%=lang(cnnDB, "UserName")%></th>
+              <th><%=lang(cnnDB, "AssignedTo")%></th>
+              <th>Estado</th>
+              <th style="width:130px"><%=lang(cnnDB, "Date")%></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% Do While Not listRes.EOF %>
+              <tr>
+                <td style="font-weight:700">
+                  <a href="details.asp?id=<% = listRes("id") %>">#<% = listRes("id") %></a>
+                </td>
+                <td>
+                  <a href="details.asp?id=<% = listRes("id") %>">
+                    <% = FixTildes(Server.HTMLEncode(listRes("title"))) %>
+                  </a>
+                </td>
+                <td><% = FixTildes(Server.HTMLEncode(listRes("uid"))) %></td>
+                <td><% = Server.HTMLEncode(listRes("ruid")) %></td>
+                <td><% = StatusBadge(FixTildes(listRes("sname"))) %></td>
+                <td><% = DisplayDate(listRes("start_date"), lhdDateOnly) %></td>
+              </tr>
+            <% 
+                listRes.MoveNext
+               Loop 
+            %>
+          </tbody>
+        </table>
+      </div>
+    <% End If %>
+  </div>
+
+</div>
+
+<%	End If
 
     ' Close results
     rstProbList.Close

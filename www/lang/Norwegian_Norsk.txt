@@ -315,6 +315,7 @@ Securitylevel=Sikkerhetsnivå
 Securitylevels=Sikkerhetsnivåer
 SelectCategory=Velg kategori
 SelectDepartment=Velg avdeling
+SelectAnExistingUser=Velg en eksisterende bruker
 SelectUser=Velg bruker
 ShowAll=Vis alle
 Site=Applikasjon

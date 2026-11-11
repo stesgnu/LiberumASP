@@ -1,5 +1,5 @@
-<%@ LANGUAGE="VBScript" %>
-<% 
+<%@ LANGUAGE="VBScript" CODEPAGE="65001" %>
+<%
   Option Explicit
   'Buffer the response, so Response.Expires can be used
   Response.Buffer = TRUE
@@ -21,15 +21,25 @@
   -->
 
   <!-- 	#include file = "../public.asp" -->
-  <% 
+  <%
     Dim cnnDB, sid
     Set cnnDB = CreateCon
     sid = GetSid
   %>
 
   <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta charset="utf-8">
     <title><%=lang(cnnDB, "HelpDesk")%>&nbsp;-&nbsp;<%=lang(cnnDB, "ProblemUpdated")%></title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" type="text/css" href="../default.css">
+    <style>
+      .uu-card { max-width: 560px; margin: 40px auto; text-align: center; padding: 36px 32px; }
+      .uu-icon { width: 64px; height: 64px; border-radius: 50%; background: #DCFCE7; color: #16A34A; font-size: 32px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 14px; }
+      .uu-card h2 { font-size: 20px; margin: 0 0 8px; color: #1a202c; }
+      .uu-card p { font-size: 14px; color: #4a5568; margin: 0 0 22px; }
+      .uu-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    </style>
   </head>
   <body>
     <%
@@ -41,8 +51,8 @@
       Dim uid, id, notes
 
       uid = 	Usr(cnnDB, sid, "uid")
-      id = Request.Form("id")
-      notes = Request.Form("notes")
+      id = SafeCLng(Request.Form("id"))
+      notes = CleanInputText(Request.Form("notes"))
 
     ' Check for required fields (uemail, category, department, title, description)
 
@@ -54,7 +64,16 @@
 
     ' Get old description
       Dim description, rep, rstOldRep, rstUpdateNotes, dtNoteDate
-      Set rstOldRep = SQLquery(cnnDB, "SELECT rep FROM problems WHERE id=" & id)
+      ' Solo se pueden agregar notas a tickets propios
+      Set rstOldRep = SQLquery(cnnDB, "SELECT rep FROM problems WHERE id=" & id & " AND uid='" & Replace(uid & "", "'", "''") & "'")
+      If rstOldRep.EOF Then
+        rstOldRep.Close
+        cnnDB.Close
+        Response.Clear
+        Response.Status = "403 Forbidden"
+        Response.Write "Acceso denegado."
+        Response.End
+      End If
       rep = rstOldRep("rep")
 
       dtNoteDate = SQLDate(Now, lhdAddSQLDelim)
@@ -67,23 +86,28 @@
         Usr(cnnDB, sid, "uid") & "', 0)")
 
     Call eMessage(cnnDB, "repupdate", id, Usr(cnnDB, rep, "email1"))
+    Call LhdToast("success", lang(cnnDB, "Problem") & " " & id & " " & lang(cnnDB, "isUpdated"))
 
+      Call DisplayHeader(cnnDB, sid)
     %>
-    <div align="center">
-      <table class="Normal">
-      <tr class="Head1">
-        <td colspan="2">
-          <%=lang(cnnDB, "Problem")%>&nbsp;<% = id %>&nbsp;<%=lang(cnnDB, "isUpdated")%>
-        </td>
-      </tr>
-      <tr class="Body1">
-        <td>
-          <div align="center">
-            <%=lang(cnnDB, "Viewthedetailsof")%> <a href="details.asp?id=<% = id %>"><%=lang(cnnDB, "Problem")%>&nbsp;<% = id %></a>.
-          </div>
-        </td>
-      </tr>
-      </table>
+
+    <div class="lhd-wrapper">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px">
+        <div class="lhd-page-title" style="margin:0"><span class="title-icon">&#128172;</span> <%=lang(cnnDB, "ProblemUpdated")%></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <a class="btn btn-secondary" href="view.asp">&larr; Volver</a>
+        </div>
+      </div>
+
+      <div class="lhd-card uu-card">
+        <div class="uu-icon">&#10004;</div>
+        <h2><%=lang(cnnDB, "Problem")%>&nbsp;#<% = id %>&nbsp;<%=lang(cnnDB, "isUpdated")%></h2>
+        <p><%=lang(cnnDB, "Viewthedetailsof")%> <%=lang(cnnDB, "Problem")%>&nbsp;#<% = id %>.</p>
+        <div class="uu-actions">
+          <a class="btn btn-primary" href="details.asp?id=<% = id %>"><%=lang(cnnDB, "Problem")%>&nbsp;#<% = id %> &rarr;</a>
+          <a class="btn btn-secondary" href="view.asp">&larr; Volver</a>
+        </div>
+      </div>
     </div>
 
     <%

@@ -1,4 +1,4 @@
-<%@ LANGUAGE="VBScript" %>
+<%@ LANGUAGE="VBScript" CODEPAGE="65001" %>
 <% 
   Option Explicit
   'Buffer the response, so Response.Expires can be used
@@ -24,17 +24,89 @@
   
   <!-- 	#include file = "../public.asp" -->
 
-  <% 
+  <%
     Dim cnnDB, sid
     Set cnnDB = CreateCon
     sid = GetSid
+
+    ' Columnas adicionales de categories (estado / ANS): se arman las partes del SQL segun el
+    ' tipo de dato real de cada columna (solo las que existen y llegaron en el formulario).
+    Dim catSet, catCols, catVals
+    catSet = ""
+    catCols = ""
+    catVals = ""
+
+    Function CatLiteral(t, raw, defSize, label)
+      Dim v
+      v = Trim(raw & "")
+      Select Case t
+        Case 11   ' booleano
+          If v = "1" Or LCase(v) = "true" Or LCase(v) = "activo" Then
+            CatLiteral = "1"
+          Else
+            CatLiteral = "0"
+          End If
+        Case 2, 3, 4, 5, 6, 14, 16, 17, 18, 19, 20, 21, 131   ' numericos
+          If Len(v) = 0 Then
+            CatLiteral = "NULL"
+          ElseIf IsNumeric(v) Then
+            CatLiteral = Replace(CStr(v), ",", ".")
+          Else
+            Call DisplayError(3, "El campo '" & label & "' debe ser num" & ChrW(233) & "rico.")
+          End If
+        Case Else   ' texto
+          ' Unidad del ANS: solo M (minutos), H (horas) o D (dias)
+          If (label = "Tipo de ANS" Or label = "Tipo de ANS inicial") And Len(v) > 0 Then
+            v = UCase(v)
+            If v <> "M" And v <> "H" And v <> "D" Then
+              Call DisplayError(3, "El campo '" & label & "' solo admite M (minutos), H (horas) o D (d" & ChrW(237) & "as).")
+            End If
+          End If
+          If Len(v) = 0 Then
+            CatLiteral = "NULL"
+          Else
+            If defSize > 0 And defSize < 4000 Then v = Left(v, defSize)
+            CatLiteral = "'" & Replace(v, "'", "''") & "'"
+          End If
+      End Select
+    End Function
+
+    Sub BuildCatExtras()
+      Dim rsF, xi, fi, xNames, xLabels, lit, fname
+      xNames  = Array("estado", "ANS", "TipoAns", "TipoIndicador", "Ans_Ini", "TipoAnsIni")
+      xLabels = Array("Estado", "ANS", "Tipo de ANS", "Tipo de indicador", "ANS inicial", "Tipo de ANS inicial")
+      Set rsF = SQLQuery(cnnDB, "SELECT * FROM categories WHERE 1=0")
+      For xi = 0 To 5
+        For fi = 0 To rsF.Fields.Count - 1
+          If LCase(rsF.Fields(fi).Name) = LCase(xNames(xi)) Then
+            If Request.Form("x_" & xNames(xi)).Count > 0 Then
+              fname = rsF.Fields(fi).Name
+              lit = CatLiteral(rsF.Fields(fi).Type, Request.Form("x_" & xNames(xi)), rsF.Fields(fi).DefinedSize, xLabels(xi))
+              catSet = catSet & ", [" & fname & "]=" & lit
+              catCols = catCols & ", [" & fname & "]"
+              catVals = catVals & ", " & lit
+            End If
+          End If
+        Next
+      Next
+      rsF.Close
+    End Sub
   %>
 
   <head>
     <title>
       <%=lang(cnnDB, "HelpDesk")%>&nbsp;-&nbsp;<%=lang(cnnDB, "ModificationDone")%>
     </title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" type="text/css" href="../default.css">
+    <style type="text/css">
+      .pm-card { max-width: 560px; margin: 8px auto 0; text-align: center; padding: 34px 28px; }
+      .pm-icon { width: 68px; height: 68px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 32px; margin-bottom: 14px; }
+      .pm-icon.ok { background: #DCFCE7; color: #15803D; }
+      .pm-icon.err { background: #FEE2E2; color: #B91C1C; }
+      .pm-title { font-size: 22px; font-weight: 700; margin: 0 0 8px; color: #1E293B; }
+      .pm-text { font-size: 15px; color: #475569; margin: 0; line-height: 1.5; }
+    </style>
   </head>
   <body>
 
@@ -52,10 +124,10 @@
 
 
       Dim data1, data2, data3, data4
-      data1 = Request.Form("data1")
-      data2 = Request.Form("data2")
-      data3 = Request.Form("data3")
-      data4 = Request.Form("data4")
+      data1 = CleanInputText(Request.Form("data1"))
+      data2 = CleanInputText(Request.Form("data2"))
+      data3 = CleanInputText(Request.Form("data3"))
+      data4 = CleanInputText(Request.Form("data4"))
 
       'Check required fields
       If (numDataFields >= 1) AND (Len(data1) = 0) Then
@@ -86,7 +158,10 @@
         Case 6  ' Language
       End Select
 
-      Dim sqlString, rstSQL, sqlString2
+      If mType = 2 Then Call BuildCatExtras()
+
+      Dim sqlString, rstSQL, sqlString2, isNewCat
+      isNewCat = (data_id = 0)
       ' If data_id = 0 then creating a new entry in the
       ' database, otherwise we are modifying an old one
 
@@ -106,8 +181,8 @@
 
           Case 2	' category
             data_id = GetUnique(cnnDB, "categories")
-            sqlString = "INSERT INTO categories (category_id, rep_id, cname) " & _
-              "VALUES (" & data_id & "," & data2 & ",'" & data1 & "')"
+            sqlString = "INSERT INTO categories (category_id, rep_id, cname" & catCols & ") " & _
+              "VALUES (" & data_id & "," & data2 & ",'" & Replace(Left(Trim(data1), 50), "'", "''") & "'" & catVals & ")"
 
           Case 3	' department
             data_id = GetUnique(cnnDB, "departments")
@@ -174,9 +249,9 @@
                 "WHERE rep_id=" & data_id
   
             Case 2	' category
+              ' El nombre (cname) NO se modifica: se conserva para mantener correcto el historico.
               sqlString = "UPDATE categories SET " & _
-                "cname='" & data1 & "', " & _
-                "rep_id=" & data2 & " " & _
+                "rep_id=" & data2 & catSet & " " & _
                 "WHERE category_id=" & data_id
   
             Case 3	' department
@@ -202,7 +277,28 @@
 
       ' All data is present
       ' Write into database
+      Dim saveOk
+      saveOk = True
       Set rstSQL = SQLQuery(cnnDB, sqlString)
+
+      ' Categorias: comprobar que el nombre y el representante realmente quedaron guardados
+      If mType = 2 Then
+        Dim rstChk, catSaved
+        catSaved = False
+        Set rstChk = SQLQuery(cnnDB, "SELECT cname, rep_id FROM categories WHERE category_id=" & data_id)
+        If Not rstChk.EOF Then
+          ' En una categoria nueva se compara tambien el nombre; al editar el nombre no cambia.
+          catSaved = (SafeCInt(rstChk("rep_id")) = SafeCInt(data2))
+          If isNewCat Then catSaved = catSaved And (Trim(rstChk("cname") & "") = Trim(Left(Trim(data1), 50)))
+        End If
+        rstChk.Close
+        saveOk = catSaved
+        If catSaved Then
+          Call LhdToast("success", "Categor" & ChrW(237) & "a guardada correctamente.")
+        Else
+          Call LhdToast("error", "La base de datos no guard" & ChrW(243) & " el cambio de la categor" & ChrW(237) & "a. Revise restricciones, disparadores (triggers) o permisos de UPDATE sobre la tabla categories.")
+        End If
+      End If
 
       If mType = 6 and len(sqlString2) > 0 then
         Set rstSQL = SQLQuery(cnnDB, sqlString2)
@@ -210,38 +306,49 @@
 
     %>
 
-    <div align="center">
-      <table class="Normal">
-        <tr class="Head1">
-          <td>
-            <%=lang(cnnDB, "OperationComplete")%>
-          </td>
-        </tr>
-        <tr class="Body1">
-          <td>
-            <div align="center">
-            <%=lang(cnnDB, "Thedatabasehasbeenupdated")%>.
-            </div>
-          </td>
-        </tr>
-      </table>
-      <p><a href="default.asp">Administrative Menu</a></p>
-      <%
-        ' Get the correct URL to return to
-        Select Case mType
-          Case 1 %>
-            <a href="viewrep.asp"><%=lang(cnnDB, "Manage")%>&nbsp;<%=lang(cnnDB, "SupportReps")%></a>
-      <%		Case 2 %>
-            <a href="viewcat.asp"><%=lang(cnnDB, "Manage")%>&nbsp;<%=lang(cnnDB, "Categories")%></a>
-      <%		Case 3 %>
-            <a href="viewdep.asp"><%=lang(cnnDB, "Manage")%>&nbsp;<%=lang(cnnDB, "Departments")%></a>
-      <%		Case 4 %>
-            <a href="viewpri.asp"><%=lang(cnnDB, "Manage")%>&nbsp;<%=lang(cnnDB, "Priorities")%></a>
-      <%		Case 5 %>
-            <a href="viewstatus.asp"><%=lang(cnnDB, "Manage")%>&nbsp;<%=lang(cnnDB, "Statuses")%></a>
-      <%		Case 6 %>
-            <a href="viewlang.asp"><%=lang(cnnDB, "Manage")%>&nbsp;<%=lang(cnnDB, "Languages")%></a>
-      <%	End Select %>
+    <%
+      ' Todo el guardado/validacion termino (los DisplayError ya se resolvieron): se dibuja la cabecera
+      Call DisplayHeader(cnnDB, sid)
+    %>
+    <div class="lhd-wrapper">
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px">
+        <div class="lhd-page-title" style="margin:0">
+          <span class="title-icon">&#128190;</span>
+          <%=lang(cnnDB, "ModificationDone")%>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <a class="btn btn-secondary" href="default.asp">&larr; <%=lang(cnnDB, "AdministrativeMenu")%></a>
+          <%
+            ' Get the correct URL to return to
+            Select Case mType
+              Case 1 %>
+                <a class="btn btn-secondary" href="viewrep.asp">&larr; <%=lang(cnnDB, "Manage")%>&nbsp;<%=lang(cnnDB, "SupportReps")%></a>
+          <%		Case 2 %>
+                <a class="btn btn-secondary" href="viewcat.asp">&larr; <%=lang(cnnDB, "Manage")%>&nbsp;<%=lang(cnnDB, "Categories")%></a>
+          <%		Case 3 %>
+                <a class="btn btn-secondary" href="viewdep.asp">&larr; <%=lang(cnnDB, "Manage")%>&nbsp;<%=lang(cnnDB, "Departments")%></a>
+          <%		Case 4 %>
+                <a class="btn btn-secondary" href="viewpri.asp">&larr; <%=lang(cnnDB, "Manage")%>&nbsp;<%=lang(cnnDB, "Priorities")%></a>
+          <%		Case 5 %>
+                <a class="btn btn-secondary" href="viewstatus.asp">&larr; <%=lang(cnnDB, "Manage")%>&nbsp;<%=lang(cnnDB, "Statuses")%></a>
+          <%		Case 6 %>
+                <a class="btn btn-secondary" href="viewlang.asp">&larr; <%=lang(cnnDB, "Manage")%>&nbsp;<%=lang(cnnDB, "Languages")%></a>
+          <%	End Select %>
+        </div>
+      </div>
+
+      <div class="lhd-card pm-card">
+        <% If saveOk Then %>
+          <div class="pm-icon ok">&#10004;</div>
+          <h2 class="pm-title"><%=lang(cnnDB, "OperationComplete")%></h2>
+          <p class="pm-text"><%=lang(cnnDB, "Thedatabasehasbeenupdated")%>.</p>
+        <% Else %>
+          <div class="pm-icon err">&#9888;</div>
+          <h2 class="pm-title">No se guard&oacute; el cambio</h2>
+          <p class="pm-text">La base de datos no confirm&oacute; el cambio. Revise el aviso mostrado y vuelva a intentarlo.</p>
+        <% End If %>
+      </div>
     </div>
     
     <%

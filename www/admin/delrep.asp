@@ -1,4 +1,4 @@
-<%@ LANGUAGE="VBScript" %>
+<%@ LANGUAGE="VBScript" CODEPAGE="65001" %>
 <% 
   Option Explicit
   'Buffer the response, so Response.Expires can be used
@@ -30,7 +30,17 @@
 
   <head>
     <title><%=lang(cnnDB, "HelpDesk")%>&nbsp;-&nbsp;<%=lang(cnnDB, "RemoveSupportReps")%></title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" type="text/css" href="../default.css">
+    <style type="text/css">
+      .dr-card { max-width: 560px; margin: 8px auto 0; text-align: center; padding: 34px 28px; }
+      .dr-icon { width: 68px; height: 68px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 32px; margin-bottom: 14px; }
+      .dr-icon.ok { background: #DCFCE7; color: #15803D; }
+      .dr-icon.err { background: #FEE2E2; color: #B91C1C; }
+      .dr-title { font-size: 22px; font-weight: 700; margin: 0 0 8px; color: #1E293B; }
+      .dr-text { font-size: 15px; color: #475569; margin: 0 0 18px; line-height: 1.5; }
+      .dr-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    </style>
   </head>
   <body>
 
@@ -73,32 +83,44 @@
         Next
       End If
     %>
-    <div align="center">
-      <table class="Normal">
-        <tr class="Head1">
-          <td>
-            <font size="+2"><b><%=lang(cnnDB, "SupportRepresentatives")%></b></font>
-          </td>
-        </tr>
-        <tr class="Body1">
-          <td>
-            <div align="center">
-              <% If blnActiveProblem Then %>
-                <%=lang(cnnDB, "Theuser")%>&nbsp;'<% = strActiveRepName %>'&nbsp;
-                <%=lang(cnnDB, "DelrepOpenProblemsText")%>
-              <% ElseIf blnActiveCategory Then %>
-                <%=lang(cnnDB, "Theuser")%>&nbsp;'<% = strActiveRepName %>'&nbsp;
-                <%=lang(cnnDB, "DelrepCategoryAssignedText")%>
-              <% Else %>
-                <%=lang(cnnDB, "Thesupportrephavebeenremoved")%>
-              <% End If %>
-            </div>
-          </td>
-        </tr>
-      </table>
-      <p>
-      <a href="default.asp"><%=lang(cnnDB, "AdministrativeMenu")%></a><br>
-      <a href="viewrep.asp"><%=lang(cnnDB, "Manage")%>&nbsp;<%=lang(cnnDB, "SupportReps")%></a>
+    <%
+      Call DisplayHeader(cnnDB, sid)
+    %>
+    <div class="lhd-wrapper">
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px">
+        <div class="lhd-page-title" style="margin:0">
+          <span class="title-icon">&#128101;</span>
+          <%=lang(cnnDB, "SupportRepresentatives")%>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <a class="btn btn-secondary" href="default.asp">&larr; <%=lang(cnnDB, "AdministrativeMenu")%></a>
+          <a class="btn btn-secondary" href="viewrep.asp">&larr; <%=lang(cnnDB, "Manage")%>&nbsp;<%=lang(cnnDB, "SupportReps")%></a>
+        </div>
+      </div>
+
+      <div class="lhd-card dr-card">
+        <% If blnActiveProblem Or blnActiveCategory Then %>
+          <div class="dr-icon err">&#9940;</div>
+          <h2 class="dr-title"><%=lang(cnnDB, "UnableToDelete")%></h2>
+          <p class="dr-text">
+            <% If blnActiveProblem Then %>
+              <%=lang(cnnDB, "Theuser")%>&nbsp;'<% = Server.HTMLEncode(strActiveRepName & "") %>'&nbsp;
+              <%=lang(cnnDB, "DelrepOpenProblemsText")%>
+            <% Else %>
+              <%=lang(cnnDB, "Theuser")%>&nbsp;'<% = Server.HTMLEncode(strActiveRepName & "") %>'&nbsp;
+              <%=lang(cnnDB, "DelrepCategoryAssignedText")%>
+            <% End If %>
+          </p>
+        <% Else %>
+          <div class="dr-icon ok">&#10004;</div>
+          <h2 class="dr-title"><%=lang(cnnDB, "OperationComplete")%></h2>
+          <p class="dr-text"><%=lang(cnnDB, "Thesupportrephavebeenremoved")%></p>
+        <% End If %>
+        <div class="dr-actions">
+          <a class="btn btn-secondary" href="viewrep.asp">&larr; <%=lang(cnnDB, "Manage")%>&nbsp;<%=lang(cnnDB, "SupportReps")%></a>
+        </div>
+      </div>
     </div>
 
     <%

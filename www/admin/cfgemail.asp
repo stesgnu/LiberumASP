@@ -1,5 +1,5 @@
-<%@ LANGUAGE="VBScript" %>
-<% 
+<%@ LANGUAGE="VBScript" CODEPAGE="65001" %>
+<%
   Option Explicit
   'Buffer the response, so Response.Expires can be used
   Response.Buffer = TRUE
@@ -19,10 +19,10 @@
   Version:  $Revision: 1.50 $
   Purpose:  Form to configure the email messages sent to users and reps.
   -->
-  
+
   <!-- 	#include file = "../public.asp" -->
 
-  <% 
+  <%
     Dim cnnDB, sid
     Set cnnDB = CreateCon
     sid = GetSid
@@ -32,13 +32,20 @@
     <title>
       <%=lang(cnnDB, "HelpDesk")%>&nbsp;-&nbsp;<%=lang(cnnDB, "MessageConfiguration")%>
     </title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" type="text/css" href="../default.css">
+    <style type="text/css">
+      .ce-wrap { max-width: 860px; margin: 0 auto; }
+      .ce-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; align-items: center; }
+      .ce-body { font-family: Consolas, "Courier New", monospace; font-size: 13px; line-height: 1.5; }
+    </style>
   </head>
   <body>
 
     <%
       ' Check for perms to view this page
       Call CheckAdmin
+      Call DisplayHeader(cnnDB, sid)
 
       Dim eType, displayMenu
 
@@ -54,22 +61,23 @@
         Dim strSQL, updRes
         Dim Subject, Body
 
-        Subject = Left(Trim(Request.Form("subject")), 50)
-        Body = Trim(Request.Form("body"))
+        Subject = Left(Trim(CleanInputText(Request.Form("subject"))), 50)
+        Body = Trim(CleanInputText(Request.Form("body")))
 
         strSQL = "UPDATE tblEmailMsg SET " & _
           "subject = '" & Subject & "', " & _
           "body = '" & Body & "' " & _
-          "WHERE type='" & eType & "'"
+          "WHERE type='" & Replace(eType, "'", "''") & "'"
 
         Set updRes = SQLQuery(cnnDB, strSQL)
+        Call LhdToast("success", lang(cnnDB, "MessageSaved"))
 
       End If
 
       If Not displayMenu Then
         Dim cfgRes
         ' Get current configuration
-        Set cfgRes = SQLQuery(cnnDB, "Select Subject, Body From tblEmailMsg WHERE type='" & eType & "'")
+        Set cfgRes = SQLQuery(cnnDB, "Select Subject, Body From tblEmailMsg WHERE type='" & Replace(eType, "'", "''") & "'")
 
         If cfgRes.EOF Then
           Call DisplayError(3, lang(cnnDB, "Unable to read message from the database") & ".")
@@ -77,86 +85,71 @@
       End If
     %>
 
-    <div align="center">
-      <table class="Normal">
-        <tr class="Head1">
-          <td>
-            <%=lang(cnnDB, "EmailMessages")%>
-          </td>
-        </tr>
+    <div class="lhd-wrapper">
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px">
+        <div class="lhd-page-title" style="margin:0">
+          <span class="title-icon">&#9993;</span>
+          <%=lang(cnnDB, "EmailMessages")%>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <% If Not displayMenu Then %>
+            <a class="btn btn-secondary" href="cfgemail.asp">&larr; <%=lang(cnnDB, "Chooseanothermessage")%></a>
+          <% End If %>
+          <a class="btn btn-secondary" href="default.asp">&larr; <%=lang(cnnDB, "AdministrativeMenu")%></a>
+        </div>
+      </div>
+
+      <div class="ce-wrap">
         <% If displayMenu Then %>
-          <tr class="Body1">
-            <td>
-              <form method="post" action="cfgemail.asp">
-                <table class="Normal">
-                  <tr>
-                    <td width="120">
-                      <b><%=lang(cnnDB, "Message")%>:</b>
-                    </td>
-                    <td>
-                      <select name="type">
-                        <option value="usernew"><%=lang(cnnDB, "User")%> - <%=lang(cnnDB, "New")%></option>
-                        <option value="userupdate"><%=lang(cnnDB, "User")%> - <%=lang(cnnDB, "Update")%></option>
-                        <option value="userclose"><%=lang(cnnDB, "User")%> - <%=lang(cnnDB, "Close")%></option>
-                        <option value="repnew"><%=lang(cnnDB, "Rep")%> - <%=lang(cnnDB, "New")%></option>
-                        <option value="repupdate"><%=lang(cnnDB, "Rep")%> - <%=lang(cnnDB, "Update")%></option>
-                        <option value="repclose"><%=lang(cnnDB, "Rep")%> - <%=lang(cnnDB, "Close")%></option>
-                        <option value="reppager"><%=lang(cnnDB, "Rep")%> - <%=lang(cnnDB, "Pager")%></option>
-                      </select>
-                    </td>
-                  </tr>
-                </table>
-                <p>
-                <div align="center">
-                  <input type="submit" value="<%=lang(cnnDB, "EditMessage")%>">
-                </div>
-              </form>
-            </td>
-          </tr>
+          <form method="post" action="cfgemail.asp">
+            <div class="lhd-card">
+              <div class="section-header">&#128221; <%=lang(cnnDB, "Message")%></div>
+              <div class="form-group">
+                <label class="form-label" for="type"><%=lang(cnnDB, "Message")%></label>
+                <select class="form-control" id="type" name="type">
+                  <option value="usernew"><%=lang(cnnDB, "User")%> - <%=lang(cnnDB, "New")%></option>
+                  <option value="userupdate"><%=lang(cnnDB, "User")%> - <%=lang(cnnDB, "Update")%></option>
+                  <option value="userclose"><%=lang(cnnDB, "User")%> - <%=lang(cnnDB, "Close")%></option>
+                  <option value="repnew"><%=lang(cnnDB, "Rep")%> - <%=lang(cnnDB, "New")%></option>
+                  <option value="repupdate"><%=lang(cnnDB, "Rep")%> - <%=lang(cnnDB, "Update")%></option>
+                  <option value="repclose"><%=lang(cnnDB, "Rep")%> - <%=lang(cnnDB, "Close")%></option>
+                  <option value="reppager"><%=lang(cnnDB, "Rep")%> - <%=lang(cnnDB, "Pager")%></option>
+                </select>
+              </div>
+              <div class="ce-actions">
+                <button type="submit" class="btn btn-primary">&#9998; <%=lang(cnnDB, "EditMessage")%></button>
+              </div>
+            </div>
+          </form>
         <% Else %>
-          <% 	If Request.Form("save") = "1" Then %>
-            <tr class="Head2">
-              <td>
-                <div align="center">
-                  <i><%=lang(cnnDB, "MessageSaved")%>.</i>
-                </div>
-              </td>
-            </tr>
-         <% End If %>
-          <tr class="Body1">
-            <td>
-              <form method="post" action="cfgemail.asp">
-                <input type="hidden" name="save" value="1">
-                <input type="hidden" name="type" value="<% = eType %>">
-                <table class="Normal">
-                  <tr>
-                    <td width="120">
-                      <b><%=lang(cnnDB, "Subject")%>:</b>
-                    </td>
-                    <td>
-                      <input type="text" size="50" name="subject" value="<% = cfgRes("Subject") %>">
-                    </td>
-                  </tr>
-                </table>
-                <b><%=lang(cnnDB, "Body")%>:</b><br>
-                <div align="center">
-					<b>Plain Text</b><br>
-                  <textarea rows="8" cols="80" name="body"><% = cfgRes("body") %></textarea>
-                  <p>
-                  <a href="cfgemail_help.asp" target="#"><%=lang(cnnDB, "SyntaxHelp")%></a>
-                  <p>
-                  <input type="submit" value="<%=lang(cnnDB, "Save")%>">
-                </div>
-              </form>
-            </td>
-          </tr>
+          <% If Request.Form("save") = "1" Then %>
+            <div class="alert alert-success">
+              <span class="alert-icon">&#10004;</span>
+              <span><%=lang(cnnDB, "MessageSaved")%>.</span>
+            </div>
+          <% End If %>
+          <form method="post" action="cfgemail.asp">
+            <input type="hidden" name="save" value="1">
+            <input type="hidden" name="type" value="<% = Server.HTMLEncode(eType) %>">
+            <div class="lhd-card">
+              <div class="section-header">&#128221; <%=lang(cnnDB, "Message")%>: <% = Server.HTMLEncode(eType) %></div>
+              <div class="form-group">
+                <label class="form-label" for="subject"><%=lang(cnnDB, "Subject")%></label>
+                <input type="text" class="form-control" id="subject" name="subject" maxlength="50" value="<% = Server.HTMLEncode(cfgRes("Subject") & "") %>">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="body"><%=lang(cnnDB, "Body")%> (Plain Text)</label>
+                <textarea class="form-control ce-body" id="body" name="body" rows="12"><% = Server.HTMLEncode(cfgRes("body") & "") %></textarea>
+              </div>
+              <div class="ce-actions">
+                <a class="btn btn-secondary" href="cfgemail_help.asp" target="_blank">&#8505; <%=lang(cnnDB, "SyntaxHelp")%></a>
+                <button type="submit" class="btn btn-primary">&#128190; <%=lang(cnnDB, "Save")%></button>
+              </div>
+            </div>
+          </form>
         <% End If %>
-      </table>
-      <p>
-      <% If Not displayMenu Then %>
-        <a href="cfgemail.asp"><%=lang(cnnDB, "Chooseanothermessage")%></a><br>
-      <% End If %>
-      <a href="default.asp"><%=lang(cnnDB, "AdministrativeMenu")%></a>
+      </div>
     </div>
     <%
     '	cfgRes.Close

@@ -1,4 +1,4 @@
-<%@ LANGUAGE="VBScript" %>
+<%@ LANGUAGE="VBScript" CODEPAGE="65001" %>
 <% 
   Option Explicit
   'Buffer the response, so Response.Expires can be used
@@ -39,61 +39,57 @@
     <%
       ' Check for perms to view this page
       Call CheckAdmin
+      Call DisplayHeader(cnnDB, sid)
 
       Dim rstPriList
       Set rstPriList = SQLQuery(cnnDB, "SELECT priority_id, pname FROM priority WHERE priority_id > 0 ORDER BY priority_id ASC")
 
     %>
-    <div align="center">
-      <table class="Normal">
-        <tr class="Head1">
-          <td colspan="3">
-            <%=lang(cnnDB, "Priorities")%>
-          </td>
-        </tr>
-        <tr class="Head2">
-          <td>
-            <div align="center">
-              <%=lang(cnnDB, "ID")%>
-            </div>
-          </td>
-          <td>
-            <div align="center">
-              <%=lang(cnnDB, "Priority")%>
-            </div>
-          </td>
-          <td>
-            <div align="center">
-              <%=lang(cnnDB, "Modify")%>
-            </div>
-          </td>
-        </tr>
-        <%
-          Do While Not rstPriList.EOF
-        %>
-        <tr class="Body1">
-          <td align="center">
-            <% = rstPriList("priority_id") %>
-          </td>
-          <td align="center">
-            <% = rstPriList("pname") %>
-          </td>
-          <td align="center">
-            <a href="modify.asp?mtype=4&id=<% = rstPriList("priority_id") %>"><%=lang(cnnDB, "Edit")%></a>
-            &nbsp|&nbsp <a href="confdelete.asp?mtype=4&id=<% = rstPriList("priority_id") %>"><%=lang(cnnDB, "Delete")%></a>
-          </td>
-        </tr>
-        <%
-          rstPriList.MoveNext
-          Loop
-        %>
-      </table>
-      <p>
-        <form method="post" action="modify.asp?mtype=4">
-          <input type="submit" value="<%=lang(cnnDB, "AddNew")%>&nbsp;<%=lang(cnnDB, "Priority")%>">
-        </form><br />
-        <a href="default.asp"><%=lang(cnnDB, "AdministrativeMenu")%></a>
-      </p>
+    <div class="lhd-wrapper">
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px">
+        <div class="lhd-page-title" style="margin:0">
+          <span class="title-icon">&#9888;</span>
+          <%=lang(cnnDB, "Priorities")%>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <a class="btn btn-secondary" href="default.asp">&larr; <%=lang(cnnDB, "AdministrativeMenu")%></a>
+          <form method="post" action="modify.asp?mtype=4" style="margin:0">
+            <button type="submit" class="btn btn-primary">&#10133; <%=lang(cnnDB, "AddNew")%>&nbsp;<%=lang(cnnDB, "Priority")%></button>
+          </form>
+        </div>
+      </div>
+
+      <div class="lhd-card lhd-card-flush">
+        <div style="overflow-x:auto">
+          <table class="lhd-table">
+            <thead>
+              <tr>
+                <th><%=lang(cnnDB, "ID")%></th>
+                <th><%=lang(cnnDB, "Priority")%></th>
+                <th class="col-actions"><%=lang(cnnDB, "Modify")%></th>
+              </tr>
+            </thead>
+            <tbody>
+            <%
+              Do While Not rstPriList.EOF
+            %>
+              <tr>
+                <td><span class="badge"><% = Server.HTMLEncode(rstPriList("priority_id") & "") %></span></td>
+                <td><strong><% = Server.HTMLEncode(rstPriList("pname") & "") %></strong></td>
+                <td class="col-actions">
+                  <a class="btn btn-secondary btn-sm" href="modify.asp?mtype=4&amp;id=<% = rstPriList("priority_id") %>">&#9998; <%=lang(cnnDB, "Edit")%></a>
+                  <a class="btn btn-secondary btn-sm" href="confdelete.asp?mtype=4&amp;id=<% = rstPriList("priority_id") %>">&#128465; <%=lang(cnnDB, "Delete")%></a>
+                </td>
+              </tr>
+            <%
+              rstPriList.MoveNext
+              Loop
+            %>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <%

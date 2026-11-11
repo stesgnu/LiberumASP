@@ -1,4 +1,4 @@
-<%@ LANGUAGE="VBScript" %>
+<%@ LANGUAGE="VBScript" CODEPAGE="65001" %>
 <% 
   Option Explicit
   'Buffer the response, so Response.Expires can be used
@@ -31,8 +31,15 @@
   %>
 
 <head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta charset="utf-8">
   <title><%=lang(cnnDB, "HelpDesk")%> - <%=lang(cnnDB, "EditProblem")%></title>
   <link rel="stylesheet" type="text/css" href="../default.css">
+<link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.snow.css" />
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.min.js"></script>
+<link rel="stylesheet" type="text/css" href="../js/dropzone/dropzone.min.css?v=1">
+<script type="text/javascript" src="../js/dropzone/dropzone.min.js?v=1"></script>
+<script type="text/javascript" src="../js/lhd-editor.js?v=4"></script>
 </head>
 <body>
 
@@ -51,6 +58,9 @@
     blnUpdate = False
   End If
 
+  Dim attachToken
+  attachToken = Request.Form("attachToken")
+  If Len(attachToken) = 0 Then attachToken = "d" & sid & "x" & CLng(Rnd * 1000000000) & "x" & CLng(Timer * 1000)
   Dim uid, uemail, uphone, ulocation, category, department, title, description, kb
   Dim priority, status, rep, time_spent, solution, notes, clost_date, start_date, close_date, duedate
   Dim blnNotifyRep
@@ -62,20 +72,20 @@
 
     ' Get the problem data from the form fields.
     id = Cint(Request.Form("id"))
-    uid = Request.Form("uid")
-    uemail = Request.Form("uemail")
-    uphone = Request.Form("uphone")
-    ulocation = Request.Form("ulocation")
+    uid = CleanInputText(Request.Form("uid"))
+    uemail = CleanInputText(Request.Form("uemail"))
+    uphone = CleanInputText(Request.Form("uphone"))
+    ulocation = CleanInputText(Request.Form("ulocation"))
     category = Cint(Request.Form("category"))
     department = Cint(Request.Form("department"))
-    title = Request.Form("title")
+    title = CleanInputText(Request.Form("title"))
     priority = Cint(Request.Form("priority"))
     status = Cint(Request.Form("status"))
     rep = Cint(Request.Form("rep"))
     oldrep = Cint(Request.Form("oldrep"))
-    time_spent = Request.Form("time_spent")
-    solution = Request.Form("solution")
-    notes = Request.Form("notes")
+    time_spent = SafeCLng(Request.Form("time_spent"))
+    solution = LhdSanitizeHtml(CleanInputText(Request.Form("solution")))
+    notes = CleanInputText(Request.Form("notes"))
     duedate = ConvertFormattedDate(Request.Form("duedate"))
 
     If Request.Form("kb") = "on" Then
@@ -101,10 +111,10 @@
     End if
 
     If Not IsDate(duedate) Then
-      Call DisplayError(1, lang(cnnDB, "DueDate"))
+      duedate = DateAdd("d", 1, Now())
     End If
 
-    if (status=Cfg(cnnDB, "CloseStatus")) and (Len(solution)=0) Then
+    if (status >= 100) and (Not LhdRichHasContent(solution)) Then
       Call DisplayError(1, Lang(cnnDB, "Solution"))
     End if
     
@@ -125,7 +135,7 @@
       time_spent = 0
     End If
 
-    If (Len(notes) > 0 And Request.Form("hidenotes") <> "on") Or (status=Cfg(cnnDB, "CloseStatus")) Then
+    If (Len(notes) > 0 And Request.Form("hidenotes") <> "on") Or (status >= 100) Then
       blnFirstResponse = True
     Else
       blnFirstResponse = False
@@ -222,7 +232,7 @@
   ' Get missing variables to enter problem
 
     Dim cname, catRes
-    Set catRes = SQLQuery(cnnDB, "SELECT cname, rep_id FROM categories WHERE category_id=" & Request.Form("category"))
+    Set catRes = SQLQuery(cnnDB, "SELECT cname, rep_id FROM categories WHERE category_id=" & category)
     cname = catRes("cname")
 
     Dim probRes
@@ -255,12 +265,11 @@
       "status=" & status & ", " & _
       "rep=" & rep & ", " & _
       "kb=" & kb & ", " & _
-      "due_date=" & SQLDate(duedate, lhdAddSQLDelim) & ", " & _
       "time_spent=" & time_spent & ", " & _
       "solution='" & solution & "'"
 
     ' Add the closed date/time if the problem is closed
-    If status = Cfg(cnnDB, "CloseStatus") Then
+    If status >= 100 Then
       probStr = probStr & ", close_date=" & SQLDate(Now, lhdAddSQLDelim)
 	  If (Request.Form("noemail")<>"on") Then
 	    'Set email send field to true
@@ -272,6 +281,7 @@
     probStr = probStr & " WHERE id=" & id
 
     Set probRes = SQLQuery(cnnDB, probStr)
+    Call LhdLinkAttachments(cnnDB, attachToken, id)
 
     If blnFirstResponse And Not IsDate(rstDesc("first_response")) Then
       Dim firstResponseRes
@@ -281,7 +291,7 @@
     rstDesc.Close
     Set rstDesc = Nothing
 
-    If status = Cfg(cnnDB, "CloseStatus") Then
+    If status >= 100 Then
       If Not (Request.Form("noemail")="on") Then
       ' Send mail to the user'
         Call eMessage(cnnDB, "userclose", id, uemail)
@@ -351,7 +361,8 @@
 	  Call eMessage(cnnDB, "repupdate", id, repRes("email1"))
 	  repRes.Close
 	  Response.Clear()
-	  Response.Redirect("../user/details.asp?id=" & id)
+	  Call LhdToast("success", "Ticket #" & id & " reabierto")
+		  Response.Redirect("../user/details.asp?id=" & id)
 	End if
 
   End If
@@ -361,7 +372,7 @@
 	' Query the database for the problem info
   Dim rstProb, rstSol, rstNotes, entered_by, strProbQuery
   strProbQuery = "SELECT uid, uemail, uphone, ulocation, time_spent, department, " & _
-		"category, status, priority, entered_by, rep, kb, start_date, due_date, close_date, title, description " & _
+		"category, status, priority, entered_by, rep, kb, start_date, close_date, title, description " & _
 		"FROM problems WHERE id=" & id
 
   ' Make sure rep is viewing own problems.
@@ -369,7 +380,7 @@
     strProbQuery = strProbQuery & " AND rep=" & sid
   End If
   
-	Set rstProb = SQLQuery(cnnDB, strProbQuery)
+  Set rstProb = SQLQuery(cnnDB, strProbQuery)
   
   If rstProb.EOF Then
     Call DisplayError(3, "Problem " & id & " could not be found in the database.")
@@ -393,13 +404,23 @@
   entered_by = Cint(rstProb("entered_by"))
 	start_date = rstProb("start_date")
 	close_date = rstProb("close_date")
-  duedate = rstProb("due_date")
+  duedate = DateAdd("d", 1, Now())
 	title = rstProb("title")
 	description = rstProb("description")
 
   ' Get the Notes for this problem
-  Set rstNotes = SQLQuery(cnnDB, "SELECT id, addDate, uid, private, [note] FROM tblNotes WHERE id=" & id & " ORDER BY addDate ASC")
+  ' Nombres de prioridad y estado para los badges del encabezado
+  Dim pname, sname, rstBadgePri, rstBadgeSta
+  pname = ""
+  sname = ""
+  Set rstBadgePri = SQLQuery(cnnDB, "SELECT pname FROM priority WHERE priority_id=" & priority)
+  If Not rstBadgePri.EOF Then pname = rstBadgePri("pname")
+  rstBadgePri.Close
+  Set rstBadgeSta = SQLQuery(cnnDB, "SELECT sname FROM status WHERE status_id=" & status)
+  If Not rstBadgeSta.EOF Then sname = rstBadgeSta("sname")
+  rstBadgeSta.Close
 
+  Set rstNotes = SQLQuery(cnnDB, "SELECT id, addDate, uid, private, [note] FROM tblNotes WHERE id=" & id & " ORDER BY addDate ASC")
   ' Get the solution and replace characters to make
 	' it more readable.
 	solution = rstSol("solution")
@@ -407,7 +428,7 @@
   ' If the rep has readonly access, or the problem is closed
   ' disable the fields
   Dim strTextDisable, strListDisable
-  If Usr(cnnDB, sid, "RepAccess")=2 Or status = Cfg(cnnDB, "CloseStatus") Then
+  If Usr(cnnDB, sid, "RepAccess")=2 Or status >= 100 Then
     strTextDisable = "readonly"
     strListDisable = "disabled"
   Else
@@ -417,354 +438,341 @@
 %>
 
 
-<form action="details.asp" method="POST">
-<input type="hidden" name="uid" value="<% = uid %>">
-<input type="hidden" name="id" value="<% = id %>">
-<input type="hidden" name="oldrep" value="<% = rep %>">
-<input type="hidden" name="update" value="1">
-
-<div align="center">
-<table class="Normal">
-<tr>
-	<td colspan="2" align="right">
-    <em>*</em> = <%=lang(cnnDB, "Required")%> |
-	  <a href="print.asp?id=<% = id %>" target="printwindow"><%=lang(cnnDB, "PrinterFriendly")%></a>
-	</td>
-</tr>
-<tr class="Head1">
-	<td colspan="2">
-		<%=lang(cnnDB, "EditProblem")%>&nbsp;<% = id %>
-	</td>
-</tr>
-
-<% If blnUpdate Then %>
-    <tr class="Head2">
-      <td colspan="2">
-        <div align="center">
-          <% = strUpdateMessage %>
-        </div>
-      </td>
-    </tr>
-<% End If %>
-
-<tr class="Body1">
-	<td valign="top" width="50%" >
-    <div align="center">
-      <table class="Narrow">
-      <tr>
-        <td align="center" colspan="2">
-          <b><%=lang(cnnDB, "ContactInformation")%></b>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          <b><%=lang(cnnDB, "UserName")%>:</b>
-        </td>
-        <td>
-          <a href="mailto:<% = uemail %>?Subject=HELPDESK: Problem <% = id %>"><% = uid %></a>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          <b><%=lang(cnnDB, "EMail")%>:</b>
-        </td>
-        <td>
-          <input type="text" name="uemail" size="20" value="<% = uemail %>" <% = strTextDisable %>><em>*</em>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          <b><%=lang(cnnDB, "Department")%>:</b>
-        </td>
-        <td>
-          <SELECT NAME="department" <% = strListDisable %>>
-          <%
-            Dim rstDep
-            Set rstDep = SQLQuery(cnnDB, "SELECT * From departments WHERE department_id > 0 ORDER BY dname ASC")
-            If Not rstDep.EOF Then
-            Do While Not rstDep.EOF
-            If rstDep("department_id") = department Then
-            %>
-            <OPTION VALUE="<% = rstDep("department_id")%>" SELECTED>
-            <% = rstDep("dname") %></OPTION>
-            <% Else %>
-            <OPTION VALUE="<% = rstDep("department_id")%>">
-            <% = rstDep("dname") %></OPTION>
-
-          <% 	End If
-            rstDep.MoveNext
-            Loop
-            End If
-          %>
-          </SELECT><em>*</em>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          <b><%=lang(cnnDB, "Location")%>:</b>
-        </td>
-        <td>
-          <input type="text" name="ulocation" size="20" value="<% = ulocation %>" <% = strTextDisable %>>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          <b><%=lang(cnnDB, "Phone")%>:</b>
-        </td>
-        <td>
-          <input type="text" name="uphone" size="20"value="<% = uphone %>"  <% = strTextDisable %>>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          <b><%=lang(cnnDB, "EnteredBy")%>:</b>
-        </td>
-        <td>
-          <% = Usr(cnnDb, entered_by, "uid") %>
-        </td>
-      </tr>
-    </table>
-	</td>
-	<td valign="top" >
-    <table class="Narrow">
-      <tr>
-        <td align="center" colspan="2">
-          <b><%=lang(cnnDB, "Classification")%></b>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          <b><%=lang(cnnDB, "Category")%>:</b>
-        </td>
-        <td>
-          <SELECT NAME="category" <% = strListDisable %>>
-          <%
-            Dim rstCat
-            Set rstCat = SQLQuery(cnnDB, "SELECT * From categories WHERE category_id > 0 ORDER BY cname ASC")
-            If Not rstCat.EOF Then
-            Do While Not rstCat.EOF
-            If rstCat("category_id") = category Then
-            %>
-            <OPTION VALUE="<% = rstCat("category_id")%>" SELECTED>
-            <% = rstCat("cname") %></OPTION>
-            <% Else %>
-            <OPTION VALUE="<% = rstCat("category_id")%>">
-            <% = rstCat("cname") %></OPTION>
-
-          <% 	End If
-            rstCat.MoveNext
-            Loop
-            End If
-          %>
-          </SELECT><em>*</em>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          <b><%=lang(cnnDB, "Status")%>:</b>
-        </td>
-        <td>
-          <SELECT NAME="status" id="selStatus" <% = strListDisable %>>
-          <%
-            Dim rstStat
-            Set rstStat = SQLQuery(cnnDB, "SELECT * From status WHERE status_id > 0 ORDER BY status_id ASC")
-            If Not rstStat.EOF Then
-            Do While Not rstStat.EOF
-            If rstStat("status_id") = status Then
-            %>
-            <OPTION VALUE="<% = rstStat("status_id")%>" SELECTED>
-            <% = rstStat("sname") %></OPTION>
-            <% Else %>
-            <OPTION VALUE="<% = rstStat("status_id")%>">
-            <% = rstStat("sname") %></OPTION>
-
-          <% 	End If
-            rstStat.MoveNext
-            Loop
-            End If
-          %>
-          </SELECT><em>*</em>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          <b><%=lang(cnnDB, "Priority")%>:</b>
-        </td>
-        <td>
-          <SELECT NAME="priority" <% = strListDisable %>>
-          <%
-            Dim rstPri
-            Set rstPri = SQLQuery(cnnDB, "SELECT * From priority WHERE priority_id > 0 ORDER BY priority_id ASC")
-            If Not rstPri.EOF Then
-            Do While Not rstPri.EOF
-            If rstPri("priority_id") = priority Then
-            %>
-            <OPTION VALUE="<% = rstPri("priority_id")%>" SELECTED>
-            <% = rstPri("pname") %></OPTION>
-            <% Else %>
-            <OPTION VALUE="<% = rstPri("priority_id")%>">
-            <% = rstPri("pname") %></OPTION>
-
-          <% 	End If
-            rstPri.MoveNext
-            Loop
-            End If
-          %>
-          </SELECT><em>*</em>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          <b><%=lang(cnnDB, "AssignTo")%>:</b>
-        </td>
-        <td>
-          <SELECT NAME="rep" <% = strListDisable %>>
-          <%
-            Dim rstRes
-            Set rstRes = SQLQuery(cnnDB, "SELECT * From tblUsers WHERE IsRep=1 AND RepAccess<>2 ORDER BY uid ASC")
-            If Not rstRes.EOF Then
-            Do While Not rstRes.EOF
-            If rstRes("sid") = rep Then
-            %>
-            <OPTION VALUE="<% = rstRes("sid")%>" SELECTED>
-            <% = rstRes("uid") %></OPTION>
-            <% Else %>
-            <OPTION VALUE="<% = rstRes("sid")%>">
-            <% = rstRes("uid") %></OPTION>
-
-          <% 	End If
-            rstRes.MoveNext
-            Loop
-            End If
-          %>
-          </SELECT><em>*</em>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          <b><%=lang(cnnDB, "DueDate")%>:</b>
-        </td>
-        <td>
-          <input type="text" name="duedate" size="10" maxlength="12" value="<% = DisplayDate(duedate, lhdDateOnly) %>" <% = strTextDisable %>><em>*</em>&nbsp;<font size="-2">(<% = Usr(cnnDB, sid, "dateformat") %>)</font>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          <b><%=lang(cnnDB, "TimeSpent")%>:</b>
-        </td>
-        <td>
-          <input type="text" size="4" name="time_spent" value="<% = time_spent %>"  <% = strTextDisable %>>(<%=lang(cnnDB, "minutes")%>)
-        </td>
-      </tr>
-      <tr>
-        <td>
-          <b><%=lang(cnnDB, "StartDate")%>:</b>
-        </td>
-        <td>
-          <% = DisplayDate(start_date, lhdDateTime) %>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          <b><%=lang(cnnDB, "CloseDate")%>:</b>
-        </td>
-        <td>
-          <% = DisplayDate(close_date, lhdDateTime) %>
-        </td>
-      </tr>
-    </table>
-    <% If status = Cfg(cnnDB, "CloseStatus") Then %>
-      <div align="center">
-        <b><a href="details.asp?id=<% = id %>&reopen=1"><%=lang(cnnDB, "ReopenProblem")%></a></b>
-      </div>
-    <% End If %>
-	</td>
-</tr>
-<tr class="Head2">
-  <td colspan="2" >
-    <%=lang(cnnDB, "ProblemInformation")%>:
-  </td>
-</tr>
-<tr class="Body1">
-	<td colspan="2" >
-		<b><%=lang(cnnDB, "Title")%>:</b><em>*</em><br />
-    <input type="text" name="title" size="50" value="<% = title %>"  <% = strTextDisable %>>
-		
-    <p>
-		<b><%=lang(cnnDB, "Description")%>:</b><br />
-		<textarea readonly rows="8" cols="80" name="disp_description"><% = description %></textarea>
-	</td>
-</tr>
-<tr class="Head2">
-  <td colspan="2" >
-    <%=lang(cnnDB, "Notes")%>:
-  </td>
-</tr>
-<tr class="Body1">
-  <td colspan="2" >
-    <% If rstNotes.EOF Then %>
-       <%=lang(cnnDB, "NoAvailableNotes")%>
-     <% 
-      Else
-      Do While Not rstNotes.EOF
-      
-        Response.Write("<b>[")
-        Response.Write(DisplayDate(rstNotes("addDate"), lhdDateTime) & " - " & rstNotes("uid") & "]")
-        If rstNotes("private") = 1 Then
-          Response.Write (" - PRIVATE")
-        End If
-        Response.Write("</b><br />" & vbNewLine)
-        Response.Write(Replace(rstNotes("note"), vbNewLine, "<br />"))
-        Response.Write("<p>" & vbNewLine)
-
-        rstNotes.MoveNext
-      Loop
-      End If %>
-  </td>
-</tr>
-<% If status <> Cfg(cnnDB, "CloseStatus") Then %>
-<tr class="Head2">
-  <td colspan="2" >
-    <%=lang(cnnDB, "EnterAdditionalNotes")%>:
-  </td>
-</tr>
-<tr class="Body1">
-	<td colspan="2" >
-		<textarea rows="8" cols="80" name="notes"  <% = strTextDisable %>></textarea><br />
-    <input type="checkbox" name="hidenotes" <% = strListDisable %>>&nbsp;<%=lang(cnnDB, "HideFromEndUser")%>
-	</td>
-</tr>
-<% End If %>
-<tr class="Head2">
-	<td colspan="2" >
-		<%=lang(cnnDB, "Solution")%>:
-  </td>
-</tr>
-<tr class="Body1">
-  <td colspan="2">
-    <textarea rows="8" cols="80" name="solution"  <% = strTextDisable %>><% = solution %></textarea>
-    <% If Cfg(cnnDB, "EnableKB") <> 0 Then
-         If kb = 0 Then %>
-          <input type="checkbox" name="kb" <% = strListDisable %>>&nbsp;<%=lang(cnnDB, "EnterinKnowledgeBase")%>
-        <% Else %>
-          <input type="checkbox" name="kb" checked <% = strListDisable %>>&nbsp;<%=lang(cnnDB, "EnterinKnowledgeBase")%>
-        <% End If %>
-    <% End If %>
-  </td>
-</tr>
-</table>
-<% If status <> Cfg(cnnDB, "CloseStatus") And Usr(cnnDB, sid, "RepAccess") <> 2 Then
-     Response.Write("<tr class=""Head2"" align=""center""><td colspan=""2"">")
-     If Cfg(cnnDB, "EmailType") <> 0 Then
+<%
+  Call DisplayHeader(cnnDB, sid)
 %>
-      <input type="checkbox" name="noemail" id="noEmailCheck"><label id="noEmailSend" for="noEmailCheck"><%=lang(cnnDB, "Dontsendemailtouser")%></label>
-      <p>
-    <% End If %>
-      <input type="submit" value="<%=lang(cnnDB, "SaveProblem")%>" name="B1">
-      </td></tr>
-    <% End If %>
+<div class="lhd-wrapper">
+
+  <!-- Breadcrumb y Cabecera de la Incidencia -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <a class="btn btn-secondary btn-sm" href="view.asp">&larr; Volver a la Lista</a>
+      <h2 style="margin:0;font-size:20px;font-weight:700;color:#1a202c">
+        Incidencia #<% = id %> &mdash; <% = FixTildes(Server.HTMLEncode(title)) %>
+      </h2>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <% = PriorityBadge(pname) %>
+      <% = StatusBadge(sname) %>
+      <a class="btn btn-secondary btn-sm" href="print.asp?id=<% = id %>" target="_blank">&#128424; Imprimir</a>
+      <% If status >= 100 Then %>
+        <a class="btn btn-secondary btn-sm" href="details.asp?id=<% = id %>&reopen=1">&#8635; Reabrir Ticket</a>
+      <% End If %>
+    </div>
+  </div>
+
+  <% If blnUpdate Then Call LhdToast("success", FixTildes(strUpdateMessage)) %>
+
+  <form action="details.asp" method="POST" id="frmTicketDetails">
+    <input type="hidden" name="uid" value="<% = Server.HTMLEncode(uid) %>">
+    <input type="hidden" name="id" value="<% = id %>">
+    <input type="hidden" name="oldrep" value="<% = rep %>">
+    <input type="hidden" name="update" value="1">
+
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;align-items:start">
+
+      <!-- COLUMNA IZQUIERDA (Principal) -->
+      <div>
+
+        <!-- Tarjeta: Detalle del Problema -->
+        <div class="lhd-card">
+          <div class="section-header">&#128196; Detalle de la Solicitud</div>
+
+          <div class="form-group" style="margin-bottom:16px">
+            <label class="form-label"><b><%=lang(cnnDB, "Title")%>:</b> <em>*</em></label>
+            <input type="text" name="title" class="form-control" value="<% = FixTildes(Server.HTMLEncode(title)) %>" <% = strTextDisable %> required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label"><b><%=lang(cnnDB, "Description")%>:</b></label>
+            <div class="lhd-rich" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:14px;line-height:1.6;color:#2d3748;max-height:420px;overflow-y:auto">
+              <% = LhdRichToDisplay(description) %>
+            </div>
+            <% = LhdAttachmentList(cnnDB, id) %>
+          </div>
+        </div>
+
+        <!-- Tarjeta: Historial de Notas -->
+        <div class="lhd-card">
+          <div class="section-header">&#128483; Historial de Notas y Seguimiento</div>
+
+          <% If rstNotes.EOF Then %>
+            <div style="text-align:center;padding:20px;color:#a0aec0;font-style:italic">
+              <%=lang(cnnDB, "NoAvailableNotes")%>
+            </div>
+          <% Else %>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:10px">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="lhdNotesToggle(true)">Expandir todas</button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="lhdNotesToggle(false)">Contraer todas</button>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <% Do While Not rstNotes.EOF %>
+                <details class="lhd-note" style="background:#f8fafc;border-left:4px solid <% If rstNotes("private") = 1 Then %>#D69E2E<% Else %>var(--color-primary,#0057B8)<% End If %>;border-radius:0 6px 6px 0">
+                  <summary style="cursor:pointer;padding:10px 16px;font-size:13px;color:#2d3748">
+                    <strong>&#128100; <% = Server.HTMLEncode(NoteAuthorName(cnnDB, rstNotes("uid"))) %></strong>
+                    &bull; <% = DisplayDate(rstNotes("addDate"), lhdDateTime) %>
+                  </summary>
+                  <div style="padding:0 16px 12px 16px">
+                    <% If rstNotes("private") = 1 Then %>
+                      <span class="badge" style="background:#FEFCBF;color:#744210;font-size:10px;display:inline-block;margin-bottom:6px">&#128274; NOTA INTERNA</span>
+                    <% End If %>
+                    <div style="color:#2d3748;line-height:1.5;white-space:pre-wrap"><% = FixTildes(Server.HTMLEncode(rstNotes("note"))) %></div>
+                  </div>
+                </details>
+              <%
+                  rstNotes.MoveNext
+                 Loop
+              %>
+            </div>
+            <script type="text/javascript">
+              function lhdNotesToggle(abrir) {
+                var items = document.querySelectorAll('details.lhd-note');
+                for (var i = 0; i < items.length; i++) { items[i].open = abrir; }
+              }
+            </script>
+          <% End If %>
+        </div>
+
+        <!-- Tarjeta: Agregar Nota (solo si ticket no esta cerrado) -->
+        <% If status < 100 Then %>
+          <div class="lhd-card">
+            <div class="section-header">&#10133; <%=lang(cnnDB, "EnterAdditionalNotes")%></div>
+            <div class="form-group" style="margin-bottom:12px">
+              <textarea rows="4" class="form-control" name="notes" placeholder="Escribe aqu&iacute; notas de seguimiento o avances..." <% = strTextDisable %>></textarea>
+            </div>
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+              <input type="checkbox" name="hidenotes" <% = strListDisable %>>
+              <%=lang(cnnDB, "HideFromEndUser")%> (Nota solo visible para t&eacute;cnicos)
+            </label>
+          </div>
+        <% End If %>
+
+        <!-- Tarjeta: Solucion -->
+        <div class="lhd-card">
+          <div class="section-header">&#9989; <%=lang(cnnDB, "Solution")%></div>
+          <div class="form-group" style="margin-bottom:12px">
+            <% If strTextDisable = "" Then %>
+            <div id="solEditor" style="background:#fff;min-height:140px"></div>
+            <% Else %>
+            <div class="lhd-rich" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:14px;line-height:1.6">
+              <% = LhdRichToDisplay(solution) %>
+            </div>
+            <% End If %>
+            <textarea name="solution" id="solField" style="display:none"><% = FixTildes(Server.HTMLEncode(solution)) %></textarea>
+            <% If strTextDisable = "" Then %>
+            <div class="form-group" style="margin-top:12px">
+              <label class="form-label"><b>Agregar archivos:</b></label>
+              <input type="file" id="attachFile" multiple class="form-control" accept="<% = LhdAcceptAttr(cnnDB) %>" />
+              <div id="attachList" style="margin-top:8px"></div>
+              <input type="hidden" name="attachIds" id="attachIds" value="" />
+              <input type="hidden" name="attachToken" value="<% = attachToken %>" />
+            </div>
+            <% Else %>
+            <input type="hidden" name="attachToken" value="<% = attachToken %>" />
+            <% End If %>
+          </div>
+          <% If Cfg(cnnDB, "EnableKB") <> 0 Then %>
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+              <input type="checkbox" name="kb" <% If kb = 1 Then %>checked<% End If %> <% = strListDisable %>>
+              <%=lang(cnnDB, "EnterinKnowledgeBase")%> (Publicar soluci&oacute;n en la Base de Conocimiento)
+            </label>
+          <% End If %>
+        </div>
+
+      </div>
+
+      <!-- COLUMNA DERECHA (Metadatos y Acciones) -->
+      <div>
+
+        <!-- Tarjeta: Acciones de Guardado -->
+        <% If status < 100 And Usr(cnnDB, sid, "RepAccess") <> 2 Then %>
+          <div class="lhd-card" style="border:2px solid var(--color-primary,#0057B8)">
+            <div style="font-weight:700;font-size:14px;color:var(--color-primary,#0057B8);margin-bottom:12px">&#9889; Acciones</div>
+            <% If Cfg(cnnDB, "EmailType") <> 0 Then %>
+              <div style="margin-bottom:12px">
+                <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#4a5568;cursor:pointer">
+                  <input type="checkbox" name="noemail" id="noEmailCheck">
+                  <%=lang(cnnDB, "Dontsendemailtouser")%>
+                </label>
+              </div>
+            <% End If %>
+            <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;font-size:14px">
+              &#128190; <%=lang(cnnDB, "SaveProblem")%>
+            </button>
+          </div>
+        <% End If %>
+
+        <!-- Tarjeta: Gestion de la Incidencia -->
+        <div class="lhd-card">
+          <div class="section-header">&#9881; <%=lang(cnnDB, "Classification")%></div>
+
+          <div class="form-group" style="margin-bottom:12px">
+            <label class="form-label"><b><%=lang(cnnDB, "Status")%>:</b></label>
+            <select name="status" id="selStatus" class="form-control" <% = strListDisable %>>
+              <%
+                Dim rstStat
+                Set rstStat = SQLQuery(cnnDB, "SELECT * From status WHERE status_id > 0 ORDER BY status_id ASC")
+                If Not rstStat.EOF Then
+                  Do While Not rstStat.EOF
+                    If rstStat("status_id") = status Then
+                      Response.Write "<option value=""" & rstStat("status_id") & """ selected>" & FixTildes(rstStat("sname")) & "</option>" & vbNewLine
+                    Else
+                      Response.Write "<option value=""" & rstStat("status_id") & """>" & FixTildes(rstStat("sname")) & "</option>" & vbNewLine
+                    End If
+                    rstStat.MoveNext
+                  Loop
+                End If
+              %>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-bottom:12px">
+            <label class="form-label"><b><%=lang(cnnDB, "Priority")%>:</b></label>
+            <select name="priority" class="form-control" <% = strListDisable %>>
+              <%
+                Dim rstPri
+                Set rstPri = SQLQuery(cnnDB, "SELECT * From priority WHERE priority_id > 0 ORDER BY priority_id ASC")
+                If Not rstPri.EOF Then
+                  Do While Not rstPri.EOF
+                    If rstPri("priority_id") = priority Then
+                      Response.Write "<option value=""" & rstPri("priority_id") & """ selected>" & FixTildes(rstPri("pname")) & "</option>" & vbNewLine
+                    Else
+                      Response.Write "<option value=""" & rstPri("priority_id") & """>" & FixTildes(rstPri("pname")) & "</option>" & vbNewLine
+                    End If
+                    rstPri.MoveNext
+                  Loop
+                End If
+              %>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-bottom:12px">
+            <label class="form-label"><b><%=lang(cnnDB, "AssignTo")%>:</b></label>
+            <select name="rep" class="form-control" <% = strListDisable %>>
+              <%
+                Dim rstRes
+                Set rstRes = SQLQuery(cnnDB, "SELECT * From tblUsers WHERE IsRep=1 AND RepAccess<>2 ORDER BY uid ASC")
+                If Not rstRes.EOF Then
+                  Do While Not rstRes.EOF
+                    Dim repLabel
+                    repLabel = rstRes("uid") & ""
+                    If Len(Trim(rstRes("fname") & "")) > 0 Then repLabel = Trim(rstRes("fname") & "") & " (" & rstRes("uid") & ")"
+                    If rstRes("sid") = rep Then
+                      Response.Write "<option value=""" & rstRes("sid") & """ selected>" & Server.HTMLEncode(repLabel) & "</option>" & vbNewLine
+                    Else
+                      Response.Write "<option value=""" & rstRes("sid") & """>" & Server.HTMLEncode(repLabel) & "</option>" & vbNewLine
+                    End If
+                    rstRes.MoveNext
+                  Loop
+                End If
+              %>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-bottom:12px">
+            <label class="form-label"><b><%=lang(cnnDB, "Category")%>:</b></label>
+            <select name="category" class="form-control" <% = strListDisable %>>
+              <%
+                Dim rstCat
+                Set rstCat = SQLQuery(cnnDB, "SELECT * From categories WHERE category_id > 0 ORDER BY cname ASC")
+                If Not rstCat.EOF Then
+                  Do While Not rstCat.EOF
+                    If rstCat("category_id") = category Then
+                      Response.Write "<option value=""" & rstCat("category_id") & """ selected>" & FixTildes(rstCat("cname")) & "</option>" & vbNewLine
+                    Else
+                      Response.Write "<option value=""" & rstCat("category_id") & """>" & FixTildes(rstCat("cname")) & "</option>" & vbNewLine
+                    End If
+                    rstCat.MoveNext
+                  Loop
+                End If
+              %>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-bottom:12px">
+            <label class="form-label"><b><%=lang(cnnDB, "TimeSpent")%> (<%=lang(cnnDB, "minutes")%>):</b></label>
+            <input type="number" name="time_spent" class="form-control" value="<% = time_spent %>" <% = strTextDisable %>>
+          </div>
+
+          <div style="font-size:12px;color:#718096;border-top:1px solid #e2e8f0;padding-top:10px;display:flex;flex-direction:column;gap:4px">
+            <div><strong>Registro:</strong> <% = DisplayDate(start_date, lhdDateTime) %></div>
+            <% If Len(Trim(close_date)) > 0 Then %>
+              <div><strong>Cierre:</strong> <% = DisplayDate(close_date, lhdDateTime) %></div>
+            <% End If %>
+          </div>
+
+        </div>
+
+        <!-- Tarjeta: Informacion del Solicitante -->
+        <div class="lhd-card">
+          <div class="section-header">&#128100; <%=lang(cnnDB, "ContactInformation")%></div>
+
+          <div class="form-group" style="margin-bottom:10px">
+            <label class="form-label"><b><%=lang(cnnDB, "UserName")%>:</b></label>
+            <div style="font-weight:600;color:#1a202c"><% = Server.HTMLEncode(LhdUserDisplayName(cnnDB, uid)) %></div>
+          </div>
+
+          <div class="form-group" style="margin-bottom:10px">
+            <label class="form-label"><b><%=lang(cnnDB, "EMail")%>:</b></label>
+            <input type="email" name="uemail" class="form-control" value="<% = Server.HTMLEncode(uemail) %>" <% = strTextDisable %> required>
+          </div>
+
+          <div class="form-group" style="margin-bottom:10px">
+            <label class="form-label"><b><%=lang(cnnDB, "Department")%>:</b></label>
+            <select name="department" class="form-control" <% = strListDisable %>>
+              <%
+                Dim rstDep
+                Set rstDep = SQLQuery(cnnDB, "SELECT * From departments WHERE department_id > 0 ORDER BY dname ASC")
+                If Not rstDep.EOF Then
+                  Do While Not rstDep.EOF
+                    If rstDep("department_id") = department Then
+                      Response.Write "<option value=""" & rstDep("department_id") & """ selected>" & FixTildes(rstDep("dname")) & "</option>" & vbNewLine
+                    Else
+                      Response.Write "<option value=""" & rstDep("department_id") & """>" & FixTildes(rstDep("dname")) & "</option>" & vbNewLine
+                    End If
+                    rstDep.MoveNext
+                  Loop
+                End If
+              %>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-bottom:10px">
+            <label class="form-label"><b><%=lang(cnnDB, "Location")%>:</b></label>
+            <input type="text" name="ulocation" class="form-control" value="<% = FixTildes(Server.HTMLEncode(ulocation)) %>" <% = strTextDisable %>>
+          </div>
+
+          <div class="form-group" style="margin-bottom:10px">
+            <label class="form-label"><b><%=lang(cnnDB, "Phone")%>:</b></label>
+            <input type="text" name="uphone" class="form-control" value="<% = Server.HTMLEncode(uphone) %>" <% = strTextDisable %>>
+          </div>
+
+          <div style="font-size:12px;color:#718096;border-top:1px solid #e2e8f0;padding-top:10px">
+            <strong><%=lang(cnnDB, "EnteredBy")%>:</strong> <% = Server.HTMLEncode(Usr(cnnDB, entered_by, "uid")) %>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  </form>
+<script type="text/javascript">
+  (function () {
+    var tokenEl = document.querySelector('input[name=attachToken]');
+    if (!tokenEl) { return; }
+    var uploadUrl = '../attach/upload.asp';
+    if (document.getElementById('solEditor')) {
+      LhdEditor.createEditor({ editorId: 'solEditor', fieldId: 'solField', uploadUrl: uploadUrl, token: tokenEl.value, placeholder: 'Describa la solucion aplicada...' });
+    }
+    if (document.getElementById('attachFile')) {
+      LhdEditor.attachments({ fileInputId: 'attachFile', listId: 'attachList', idsId: 'attachIds', uploadUrl: uploadUrl, token: tokenEl.value, maxBytes: <% = LhdMaxAttachBytes(cnnDB) %> });
+    }
+  })();
+</script>
+
 </div>
-</form>
+
 <%
 	' close record sets
 	rstCat.Close

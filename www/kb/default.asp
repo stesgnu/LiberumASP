@@ -1,4 +1,4 @@
-<%@ LANGUAGE="VBScript" %>
+<%@ LANGUAGE="VBScript" CODEPAGE="65001" %>
 <% 
   Option Explicit
   Response.Buffer = TRUE
@@ -13,10 +13,10 @@
   Liberum Help Desk comes with ABSOLUTELY NO WARRANTY
   Please view the license.html file for the full GNU General Public License.
 
-  Filename: default.asp
+  Filename: default.asp (kb)
   Date:     $Date: 2002/06/15 23:49:20 $
   Version:  $Revision: 1.50.4.1 $
-  Purpose:  Form for submitting keywords to search knowledge base.
+  Purpose:  Knowledge Base Search with modern UI & highlight.
   -->
 
   <!-- 	#include file = "../public.asp" -->
@@ -28,26 +28,37 @@
 
   <head>
     <title><%=lang(cnnDB, "HelpDesk")%> - <%=lang(cnnDB, "KnowledgeBase")%></title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" type="text/css" href="../default.css">
   </head>
   <body>
 
     <%
-      ' See if authenticated
+      ' Check permissions
       Call CheckKB(cnnDB, sid)
-      Dim blnSearch
+      Call DisplayHeader(cnnDB, sid)
+
+      Dim blnSearch, keywords
       blnSearch = False
-      
-      If (Request.Form("search") = "1") And Len(Request.Form("keywords")) > 0 Then
+      keywords = Trim(CleanInputText(Request.Form("keywords")))
+      If Len(keywords) = 0 Then
+        keywords = Trim(Request.QueryString("keywords"))
+      End If
+
+      If (Request.Form("search") = "1" Or Len(keywords) > 0) Then
         blnSearch = True
       End If
 
-      If blnSearch Then
-        Dim queryStr, strWhere1, strWhere2, keywords, srchRes, varWordList, blAllOff
-        keywords = Trim(Request.Form("keywords"))
-        varWordList = Split(keywords, " ")
+      Dim queryStr, strWhere1, strWhere2, srchRes, varWordList, blAllOff, kwSql
+      ' Version de las palabras clave segura para SQL (comillas duplicadas, sin ; ni comentarios)
+      kwSql = Replace(keywords, "'", "''")
+      kwSql = Replace(kwSql, ";", " ")
+      kwSql = Replace(kwSql, "--", " ")
 
-        queryStr = "SELECT id, title, start_date, close_date FROM problems"
+      If blnSearch And Len(keywords) > 0 Then
+        varWordList = Split(kwSql, " ")
+
+        queryStr = "SELECT id, title, description, solution, start_date, close_date FROM problems"
         strWhere1 = "WHERE (kb=1 AND status=" & Cfg(cnnDB, "CloseStatus") & ")"
 
         If Request.Form("title") <> "on" And Request.Form("description") <> "on" And Request.Form("solution") <> "on" Then
@@ -59,23 +70,23 @@
         If Cfg(cnnDB, "KBFreeText") = 1 Then
           If Request.Form("title") = "on" Or blAllOff Then
             If Len(strWhere2) < 1 Then
-              strWhere2 = " AND (FREETEXT(title, '" & keywords & "')"
+              strWhere2 = " AND (FREETEXT(title, '" & kwSql & "')"
             Else
-              strWhere2 = strWhere2 & " OR FREETEXT(title, '" & keywords & "')"
+              strWhere2 = strWhere2 & " OR FREETEXT(title, '" & kwSql & "')"
             End If
           End If
           If Request.Form("description") = "on" Or blAllOff Then
             If Len(strWhere2) < 1 Then
-              strWhere2 = " AND (FREETEXT(description, '" & keywords & "')"
+              strWhere2 = " AND (FREETEXT(description, '" & kwSql & "')"
             Else
-              strWhere2 = strWhere2 & " OR FREETEXT(description, '" & keywords & "')"
+              strWhere2 = strWhere2 & " OR FREETEXT(description, '" & kwSql & "')"
             End If
           End If
           If Request.Form("solution") = "on" Or blAllOff Then
             If Len(strWhere2) < 1 Then
-              strWhere2 = " AND (FREETEXT(solution, '" & keywords & "')"
+              strWhere2 = " AND (FREETEXT(solution, '" & kwSql & "')"
             Else
-              strWhere2 = strWhere2 & " OR FREETEXT(solution, '" & keywords & "')"
+              strWhere2 = strWhere2 & " OR FREETEXT(solution, '" & kwSql & "')"
             End If
           End If
           strWhere2 = strWhere2 & ")"
@@ -134,133 +145,118 @@
           strWhere2 = strWhere2 & ")"
         End If
 
-        queryStr = queryStr & " " & strWhere1 & strWhere2 & " ORDER BY start_date ASC"
+        queryStr = queryStr & " " & strWhere1 & strWhere2 & " ORDER BY start_date DESC"
         Set srchRes = SQLQuery(cnnDB, queryStr)
-
       End If
-
-
-    If Not blnSearch Then
     %>
-    <div align="center">
-    <table class="Normal">
-      <tr class="Head1">
-        <td>
-          <%=lang(cnnDB, "KnowledgeBase")%>
-        </td>
-      </tr>
-      <tr class="Body1">
-        <td>
-          <form method="post" action="default.asp">
-            <input type="hidden" name="search" value="1">
-            <div align="center">
-              <table  class="Normal">
-                <tr>
-                  <td width="100">
-                    <b><%=lang(cnnDB, "Keywords")%>:</b>
-                  </td>
-                  <td>
-                    <input type="text" size="50" name="keywords">
-                  </td>
-                </tr>
-                <tr>
-                  <td valign="top">
-                    <b><%=lang(cnnDB, "SearchFields")%>:</b>
-                  </td>
-                  <td>
-                    <input type="checkbox" name="title" checked> <%=lang(cnnDB, "Title")%><br />
-                    <input type="checkbox" name="description" checked> <%=lang(cnnDB, "Description")%><br />
-                    <input type="checkbox" name="solution" checked> <%=lang(cnnDB, "Solution")%><br />
-                  </td>
-                </tr>
+
+    <div class="lhd-wrapper">
+
+      <!-- Hero Search Banner -->
+      <div class="lhd-search-hero">
+        <h2>&#128218; <%=lang(cnnDB, "KnowledgeBase")%></h2>
+        <p>&iquest;C&oacute;mo podemos ayudarte hoy? Busca soluciones a problemas comunes</p>
+
+        <form method="post" action="default.asp" class="lhd-search-bar">
+          <input type="hidden" name="search" value="1">
+          <input type="text"
+                 name="keywords"
+                 value="<% = Server.HTMLEncode(keywords) %>"
+                 placeholder="Escribe palabras clave (ej: contrase&ntilde;a, vpn, impresora)..."
+                 autofocus>
+          <button type="submit">&#128269; <%=lang(cnnDB, "Search")%></button>
+        </form>
+
+        <div style="margin-top:14px;font-size:12px;opacity:.9;display:flex;justify-content:center;gap:16px;flex-wrap:wrap">
+          <label style="cursor:pointer;display:flex;align-items:center;gap:4px">
+            <input type="checkbox" name="title" checked> <%=lang(cnnDB, "Title")%>
+          </label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:4px">
+            <input type="checkbox" name="description" checked> <%=lang(cnnDB, "Description")%>
+          </label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:4px">
+            <input type="checkbox" name="solution" checked> <%=lang(cnnDB, "Solution")%>
+          </label>
+        </div>
+      </div>
+
+      <!-- Buscar por ID directo -->
+      <div class="lhd-card" style="padding:14px 20px;margin-bottom:20px">
+        <form method="POST" action="details.asp" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span style="font-size:13px;font-weight:600;color:var(--color-text-secondary)">&#128203; <%=lang(cnnDB, "LookupbyID")%>:</span>
+          <input type="text" size="8" name="id" class="form-control" placeholder="ID..." style="width:110px">
+          <button type="submit" class="btn btn-secondary btn-sm"><%=lang(cnnDB, "LookupbyID")%></button>
+        </form>
+      </div>
+
+      <!-- Resultados de busqueda -->
+      <% If blnSearch Then %>
+        <% If srchRes.EOF Then %>
+          <div class="lhd-card" style="text-align:center;padding:40px">
+            <div style="font-size:42px;margin-bottom:12px">&#128269;</div>
+            <h3><%=lang(cnnDB, "Noresultsfound")%></h3>
+            <p style="color:var(--color-muted);font-size:13px">
+              No encontramos art&iacute;culos que coincidan con "<strong><% = Server.HTMLEncode(keywords) %></strong>".
+            </p>
+            <p style="margin-top:16px">
+              <a class="btn btn-primary btn-sm" href="../user/new.asp">&#10133; Crear una nueva solicitud</a>
+            </p>
+          </div>
+        <% Else %>
+          <div class="lhd-card" style="padding:0;overflow:hidden">
+            <div style="padding:14px 20px;background:var(--color-surface);border-bottom:1px solid var(--color-border-light)">
+              <strong>Art&iacute;culos de soluci&oacute;n encontrados</strong>
+            </div>
+            <div style="overflow-x:auto">
+              <table class="lhd-table">
+                <thead>
+                  <tr>
+                    <th class="col-id">ID</th>
+                    <th><%=lang(cnnDB, "Title")%></th>
+                    <th>Soluci&oacute;n previa</th>
+                    <th class="col-date">Fecha resoluci&oacute;n</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% Do While Not srchRes.EOF %>
+                    <tr>
+                      <td class="col-id">
+                        <a href="details.asp?id=<% = srchRes("id") %>">#<% = srchRes("id") %></a>
+                      </td>
+                      <td>
+                        <a href="details.asp?id=<% = srchRes("id") %>" style="font-weight:600">
+                          <% = HighlightTerm(srchRes("title"), keywords) %>
+                        </a>
+                      </td>
+                      <td style="color:var(--color-text-secondary);font-size:12px;max-width:320px">
+                        <% 
+                          Dim solSnippet
+                          solSnippet = srchRes("solution")
+                          If Len(solSnippet) > 120 Then solSnippet = Left(solSnippet, 120) & "..."
+                          Response.Write HighlightTerm(solSnippet, keywords)
+                        %>
+                      </td>
+                      <td class="col-date">
+                        <% = DisplayDate(srchRes("close_date"), lhdDateOnly) %>
+                      </td>
+                    </tr>
+                  <%
+                      srchRes.MoveNext
+                    Loop
+                  %>
+                </tbody>
               </table>
-              <input type="submit" value="<%=lang(cnnDB, "Search")%>">
             </div>
-          </form>
-        </td>
-      </tr>
-    </table>
+          </div>
+        <% End If %>
+      <% End If %>
+
     </div>
-    <p>
-    <% Else
 
-      If srchREs.EOF Then
-    %>
-      <div align="center">
-        <table class="Wide">
-          <tr class="Head1">
-            <td>
-              <%=lang(cnnDB, "KnowledgeBase")%>
-            </td>
-          </tr>
-          <tr class="Body1">
-            <td>
-              <div align="center">
-                <b><%=lang(cnnDB, "Noresultsfound")%>.</b>
-              </div>
-            </td>
-          </tr>
-        </table>
-      </div>
-      <p>
-    <%	Else %>
-      <div align="center">
-      <table class="Wide">
-      <tr class="Head1">
-        <td colspan="3">
-          <%=lang(cnnDB, "KnowledgeBase")%>
-        </td>
-      </tr>
-      <tr class="Head2">
-        <td width="250">
-          <div align="center">
-            <%=lang(cnnDB, "Title")%>
-          </div>
-        </td>
-        <td>
-          <div align="center">
-            <%=lang(cnnDB, "StartDate")%>
-          </div>
-        </td>
-        <td>
-          <div align="center">
-            <%=lang(cnnDB, "CloseDate")%>
-          </div>
-        </td>
-      </tr>
-      <%	Do While Not srchRes.EOF %>
-        <tr class="Body1">
-          <td>
-            <div align="center">
-              <a href="details.asp?id=<% = srchRes("id") %>"><% = srchRes("title") %></a>
-            </div>
-          </td>
-          <td>
-            <div align="center">
-              <% = DisplayDate(srchRes("start_date"), lhdDateOnly) %>
-            </div>
-          </td>
-          <td>
-            <div align="center">
-              <% = DisplayDate(srchRes("close_date"), lhdDateOnly) %>
-            </div>
-          </td>
-        </tr>
-      <%
-          srchRes.MoveNext
-        Loop
-       %>
-      </table>
-      </div>
-      <p>
     <%
-      End If	' EOF
-      Response.Write("<div align=""center""><a href=""default.asp"">" & lang(cnnDB, "SearchAgain") & "</a></div>")
-      End If 	' search=1
-
-    Call DisplayFooter(cnnDB, sid)
-    cnnDB.Close
-
+      If blnSearch Then srchRes.Close
+      Call DisplayFooter(cnnDB, sid)
+      cnnDB.Close
     %>
   </body>
 </html>

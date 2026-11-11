@@ -1,4 +1,4 @@
-<%@ LANGUAGE="VBScript" %>
+<%@ LANGUAGE="VBScript" CODEPAGE="65001" %>
 <% 
   Option Explicit
   'Buffer the response, so Response.Expires can be used
@@ -32,7 +32,14 @@
     <title>
       <%=lang(cnnDB, "HelpDesk")%>&nbsp;-&nbsp;<%=lang(cnnDB, "ItemDeleted")%>
     </title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" type="text/css" href="../default.css">
+    <style type="text/css">
+      .dl-card { max-width: 560px; margin: 8px auto 0; text-align: center; padding: 34px 28px; }
+      .dl-icon { width: 68px; height: 68px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 32px; margin-bottom: 14px; background: #DCFCE7; color: #15803D; }
+      .dl-title { font-size: 22px; font-weight: 700; margin: 0 0 8px; color: #1E293B; }
+      .dl-text { font-size: 15px; color: #475569; margin: 0; line-height: 1.5; }
+    </style>
   </head>
   <body>
 
@@ -103,38 +110,43 @@
       End Select
 
     %>
-    <div align="center">
-      <table class="Normal">
-        <tr class="Head1">
-          <td>
-            <%=lang(cnnDB, "OperationComplete")%>
-          </td>
-        </tr>
-        <tr class="Body1">
-          <td>
-            <div align="center">
-              <%=lang(cnnDB, "Theitemhasbeendeletedfromthedatabase")%>
-            </div>
-          </td>
-        </tr>
-      </table>
-      <p><a href="default.asp"><%=lang(cnnDB, "AdministrativeMenu")%></a></p>
-      <%
-        ' Get the correct URL to return to
-        Select Case mType
-          Case 1 %>
-            <a href="viewrep.asp"><%=lang(cnnDB, "Manage")%>&nbsp;<%=lang(cnnDB, "SupportReps")%></a>
-      <%		Case 2 %>
-            <a href="viewcat.asp"><%=lang(cnnDB, "Manage")%>&nbsp;<%=lang(cnnDB, "Categories")%></a>
-      <%		Case 3 %>
-            <a href="viewdep.asp"><%=lang(cnnDB, "Manage")%>&nbsp;<%=lang(cnnDB, "Departments")%></a>
-      <%		Case 4 %>
-            <a href="viewpri.asp"><%=lang(cnnDB, "Manage")%>&nbsp;<%=lang(cnnDB, "Priorities")%></a>
-      <%		Case 5 %>
-            <a href="viewstatus.asp"><%=lang(cnnDB, "Manage")%>&nbsp;<%=lang(cnnDB, "Statuses")%></a>
-      <%		Case 6 %>
-            <a href="viewlang.asp"><%=lang(cnnDB, "Manage")%>&nbsp;<%=lang(cnnDB, "Languages")%></a>
-      <%	End Select %>
+    <%
+      ' Operacion terminada sin errores: se dibuja la cabecera
+      Call DisplayHeader(cnnDB, sid)
+    %>
+    <div class="lhd-wrapper">
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px">
+        <div class="lhd-page-title" style="margin:0">
+          <span class="title-icon">&#128465;</span>
+          <%=lang(cnnDB, "ItemDeleted")%>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <a class="btn btn-secondary" href="default.asp">&larr; <%=lang(cnnDB, "AdministrativeMenu")%></a>
+          <%
+            ' Get the correct URL to return to
+            Select Case mType
+              Case 1 %>
+                <a class="btn btn-secondary" href="viewrep.asp">&larr; <%=lang(cnnDB, "Manage")%>&nbsp;<%=lang(cnnDB, "SupportReps")%></a>
+          <%		Case 2 %>
+                <a class="btn btn-secondary" href="viewcat.asp">&larr; <%=lang(cnnDB, "Manage")%>&nbsp;<%=lang(cnnDB, "Categories")%></a>
+          <%		Case 3 %>
+                <a class="btn btn-secondary" href="viewdep.asp">&larr; <%=lang(cnnDB, "Manage")%>&nbsp;<%=lang(cnnDB, "Departments")%></a>
+          <%		Case 4 %>
+                <a class="btn btn-secondary" href="viewpri.asp">&larr; <%=lang(cnnDB, "Manage")%>&nbsp;<%=lang(cnnDB, "Priorities")%></a>
+          <%		Case 5 %>
+                <a class="btn btn-secondary" href="viewstatus.asp">&larr; <%=lang(cnnDB, "Manage")%>&nbsp;<%=lang(cnnDB, "Statuses")%></a>
+          <%		Case 6 %>
+                <a class="btn btn-secondary" href="viewlang.asp">&larr; <%=lang(cnnDB, "Manage")%>&nbsp;<%=lang(cnnDB, "Languages")%></a>
+          <%	End Select %>
+        </div>
+      </div>
+
+      <div class="lhd-card dl-card">
+        <div class="dl-icon">&#10004;</div>
+        <h2 class="dl-title"><%=lang(cnnDB, "OperationComplete")%></h2>
+        <p class="dl-text"><%=lang(cnnDB, "Theitemhasbeendeletedfromthedatabase")%></p>
+      </div>
     </div>
 
     <%

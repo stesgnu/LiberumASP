@@ -1,4 +1,4 @@
-<%@ LANGUAGE="VBScript" %>
+<%@ LANGUAGE="VBScript" CODEPAGE="65001" %>
 <% 
   Option Explicit
   'Buffer the response, so Response.Expires can be used
@@ -44,7 +44,8 @@
       ' This page will just redirect users to their menu.
       ' If they aren't logged in, CheckUser will redirect to logon.asp
 
-      If Usr(cnnDB, sid, "IsRep") = 1 Then
+      ' Un tecnico que eligio la vista de Usuario (switchview.asp) entra por el menu de usuario
+      If SafeCInt(Usr(cnnDB, sid, "IsRep")) = 1 And LCase(Session("lhd_ViewMode") & "") <> "user" Then
         cnnDB.Close
         Response.Redirect "rep/"
       Else

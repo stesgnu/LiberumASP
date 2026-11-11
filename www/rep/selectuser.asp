@@ -1,5 +1,5 @@
-<%@ LANGUAGE="VBScript" %>
-<% 
+<%@ LANGUAGE="VBScript" CODEPAGE="65001" %>
+<%
   Option Explicit
   'Buffer the response, so Response.Expires can be used
   Response.Buffer = TRUE
@@ -15,35 +15,48 @@
   Liberum Help Desk comes with ABSOLUTELY NO WARRANTY
   Please view the license.html file for the full GNU General Public License.
 
-  Filename: new.asp
+  Filename: selectuser.asp
   Date:     $Date: 2002/08/28 15:30:54 $
   Version:  $Revision: 1.51.2.1.2.2 $
-  Purpose:  This page displays the form used for entering new problems.
+  Purpose:  Ventana emergente para elegir un usuario (nuevo problema). Sin barra lateral.
   -->
 
   <!-- 	#include file = "../public.asp" -->
-  <% 
+  <%
     Dim cnnDB, sid
     Set cnnDB = CreateCon
     sid = GetSid
 
-    Dim strSearchName, blnPost
+    Dim strSearchName, strSearchSql, blnPost
     strSearchName = Trim(Request.Form("searchname"))
-    blnPost = False    
-    If (Cint(Request.Form("postform")) = 1) And (Len(strSearchName) >= 1) Then
+    strSearchSql = Replace(strSearchName, "'", "''")
+    blnPost = False
+    If (SafeCInt(Request.Form("postform")) = 1) And (Len(strSearchName) >= 1) Then
       blnPost = True
       Dim rstUsers
       Set rstUsers = SQLQuery(cnnDB, "SELECT sid, uid, firstname, lastname, location1 FROM tblUsers WHERE " & _
-        "uid LIKE '" & strSearchName & "%' OR " & _
-        "firstname LIKE '" & strSearchName & "%' OR " & _
-        "lastname LIKE '" & strSearchName & "%' " & _
+        "uid LIKE '" & strSearchSql & "%' OR " & _
+        "firstname LIKE '" & strSearchSql & "%' OR " & _
+        "lastname LIKE '" & strSearchSql & "%' " & _
         "ORDER BY lastname ASC")
     End If
   %>
 
 <head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta charset="utf-8">
 <title><%=lang(cnnDB, "HelpDesk")%> - <%=lang(cnnDB, "SelectUser")%></title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" type="text/css" href="../default.css">
+<style>
+  body { background: #F1F5F9; margin: 0; }
+  .su-page { padding: 16px; max-width: 720px; margin: 0 auto; }
+  .su-title { font-size: 17px; font-weight: 700; color: #1a202c; margin: 0 0 12px; }
+  .su-search { display: flex; gap: 8px; }
+  .su-search .form-control { flex: 1; }
+  .su-filter { margin: 12px 0 0; }
+  .su-empty { color: #718096; font-size: 13px; text-align: center; padding: 18px 0; }
+</style>
 <script language="JavaScript">
   function updateParent(formval, uid) {
      opener.document.newProbForm.uselectid.value = formval;
@@ -65,63 +78,70 @@
      self.close();
      return false;
   }
+  function suFilter(q) {
+    q = (q || '').toLowerCase();
+    var rows = document.querySelectorAll('#suBody tr');
+    for (var i = 0; i < rows.length; i++) {
+      var t = (rows[i].textContent || rows[i].innerText || '').toLowerCase();
+      rows[i].style.display = (t.indexOf(q) > -1) ? '' : 'none';
+    }
+  }
 </script>
 </head>
 <body>
 
 <%
-	' Check if user has permissions for this page
-	Call CheckRep(cnnDB, sid)
+  ' Check if user has permissions for this page
+  Call CheckRep(cnnDB, sid)
 %>
-<form method="post" action="selectuser.asp" name="selectUserForm">
-  <input type="hidden" name="postform" value="1">
-  <div align="center">
-    <table class="Normal">
-      <tr class="Head1">
-        <td colspan="5">
-          <%=lang(cnnDB, "SelectUser")%>
-        </td>
-      </tr>
-      <tr class="Body1">
-        <td colspan="5">
-          <input type="text" size="15" name="searchname" value="<% = strSearchName %>"> <input type="submit" value="<%=lang(cnnDB, "Search")%>">
-        </td>
-      </tr>
-      <% If blnPost Then 
-           If rstUsers.EOF Then
-      %>
-              <tr align="center" class="Body1">
-                <td colspan="5">
-                  <%=lang(cnnDB, "Noresultsfound")%>.
-                </td>
-              </tr>
-      <%    Else  %>
-              <tr align="center" Class="Head2">
-                <td nowrap><%=lang(cnnDB, "LastName")%></td>
-                <td><%=lang(cnnDB, "FirstName")%></td>
-                <td nowrap><%=lang(cnnDB, "UserName")%></td>
-                <td nowrap><%=lang(cnnDB, "Location")%></td>
-                <td nowrap>&nbsp;</td>
-              </tr>
+<div class="su-page">
+  <div class="lhd-card">
+    <div class="section-header">&#128269; <%=lang(cnnDB, "SelectUser")%></div>
+    <form method="post" action="selectuser.asp" name="selectUserForm">
+      <input type="hidden" name="postform" value="1">
+      <div class="su-search">
+        <input type="text" class="form-control" name="searchname" autofocus value="<% = Server.HTMLEncode(strSearchName) %>">
+        <button type="submit" class="btn btn-primary"><%=lang(cnnDB, "Search")%></button>
+      </div>
+    </form>
 
-      <%      Do While Not rstUsers.EOF %>
-                <tr valign="center" class="Body1">
-                  <td nowrap><% = rstUsers("lastname") %></td>
-                  <td nowrap><% = rstUsers("firstname") %></td>
-                  <td nowrap><% = rstUsers("uid") %></td>
-                  <td nowrap><% = rstUsers("location1") %></td>
-                  <td nowrap align="center" ><a href="javascript:updateParent('<% = rstUsers("sid") %>', '<% = rstUsers("uid") %>')">Select</a></td>
-                
-      <%        rstUsers.MoveNext
-              Loop
-            End If
+    <% If blnPost Then
+         If rstUsers.EOF Then %>
+      <div class="su-empty"><%=lang(cnnDB, "Noresultsfound")%>.</div>
+    <%   Else %>
+      <input type="text" class="form-control su-filter" placeholder="&#128269; <%=lang(cnnDB, "Search")%>..." oninput="suFilter(this.value)">
+      <div style="overflow-x:auto;margin-top:12px">
+        <table class="lhd-table">
+          <thead>
+            <tr>
+              <th><%=lang(cnnDB, "LastName")%></th>
+              <th><%=lang(cnnDB, "FirstName")%></th>
+              <th><%=lang(cnnDB, "UserName")%></th>
+              <th><%=lang(cnnDB, "Location")%></th>
+              <th>&nbsp;</th>
+            </tr>
+          </thead>
+          <tbody id="suBody">
+    <%     Do While Not rstUsers.EOF %>
+            <tr>
+              <td><% = Server.HTMLEncode(rstUsers("lastname") & "") %></td>
+              <td><% = Server.HTMLEncode(rstUsers("firstname") & "") %></td>
+              <td><% = Server.HTMLEncode(rstUsers("uid") & "") %></td>
+              <td><% = Server.HTMLEncode(rstUsers("location1") & "") %></td>
+              <td style="text-align:right"><button type="button" class="btn btn-primary btn-sm" onclick="return updateParent('<% = SafeCLng(rstUsers("sid")) %>', '<% = Server.HTMLEncode(LhdJsEsc(rstUsers("uid") & "")) %>')">Select</button></td>
+            </tr>
+    <%       rstUsers.MoveNext
+           Loop %>
+          </tbody>
+        </table>
+      </div>
+    <%   End If
          rstUsers.Close
-         End If %>
-    </table>
+       End If %>
   </div>
-</form>
+</div>
 <%
-	cnnDB.Close
+  cnnDB.Close
 %>
 
 </body>

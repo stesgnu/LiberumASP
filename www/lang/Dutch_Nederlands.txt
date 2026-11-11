@@ -315,6 +315,7 @@ Securitylevel=Veiligheidsniveau
 Securitylevels=Veiligheidsniveaus
 SelectCategory=Selecteer Categorie
 SelectDepartment=Selecteer Afdeling
+SelectAnExistingUser=Selecteer een bestaande gebruiker
 SelectUser=Selecteer Gebruiker
 ShowAll=Alles zien
 Site=Site
